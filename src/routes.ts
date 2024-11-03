@@ -1,10 +1,15 @@
 import { Router } from "express";
-import { getArticles, getArticlesByAuthor, getArticlesByTitle } from "./controllers/newsController";
+import {
+  getArticles,
+  getArticlesBySource,
+  getArticlesByTitle,
+} from "./controllers/newsController";
+import { asyncHandler } from "./middleware/asyncHandler";
 
 const router = Router();
 
-router.get('/articles', getArticles);
-router.get('/articles/title/:title', getArticlesByTitle);
-router.get('/articles/author', getArticlesByAuthor);
+router.get("/articles", asyncHandler(getArticles));
+router.get("/articles/title/:title", asyncHandler(getArticlesByTitle));
+router.get("/articles/source", asyncHandler(getArticlesBySource));
 
 export default router;

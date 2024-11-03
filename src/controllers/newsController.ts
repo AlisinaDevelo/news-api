@@ -1,24 +1,31 @@
 import { Request, Response } from "express";
-import { fetchArticles, fetchArticlesByTitle, fetchArticlesByAuthor } from "../services/newsService";
+import {
+  fetchArticles,
+  fetchArticlesBySource,
+  fetchArticlesByTitle,
+} from "../services/newsService";
+import { parseArticleCount, requireQueryString } from "../utils/validation";
 
-export const getArticles = async (req: Request, res: Response) => {
-    const { query, count } = req.query;
-    const articles = await fetchArticles(query as string, parseInt(count as string));
-    res.json(articles);
+export const getArticles = async (req: Request, res: Response): Promise<void> => {
+  const q = requireQueryString(req.query.query, "query");
+  const count = parseArticleCount(req.query.count);
+  const articles = await fetchArticles(q, count);
+  res.json(articles);
 };
 
-export const getArticlesByTitle = async (req: Request, res: Response) => {
-    const { title } = req.params;
-    const article = await fetchArticlesByTitle(title);
-    if (article) {
-        res.json(article);
-    } else {
-        res.status(404).json({ message: 'Article not found!'});
-    }
+export const getArticlesByTitle = async (req: Request, res: Response): Promise<void> => {
+  const title = decodeURIComponent(req.params.title);
+  const article = await fetchArticlesByTitle(title);
+  if (article) {
+    res.json(article);
+  } else {
+    res.status(404).json({ error: "Article not found" });
+  }
 };
 
-export const getArticlesByAuthor = async (req: Request, res: Response) => {
-    const { author, count } = req.query;
-    const articles = await fetchArticlesByAuthor(author as string, parseInt(count as string));
-    res.json(articles);
-}
+export const getArticlesBySource = async (req: Request, res: Response): Promise<void> => {
+  const source = requireQueryString(req.query.source, "source");
+  const count = parseArticleCount(req.query.count);
+  const articles = await fetchArticlesBySource(source, count);
+  res.json(articles);
+};
