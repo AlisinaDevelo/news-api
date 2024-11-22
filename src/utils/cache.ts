@@ -2,7 +2,7 @@ import NodeCache from "node-cache";
 
 const cache = new NodeCache({ stdTTL: 600});
 
-export const setCache = (key: string, value: any) => {
+export const setCache = (key: string, value: unknown) => {
     cache.set(key, value);
 };
 
