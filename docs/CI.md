@@ -5,8 +5,9 @@
 The [CI workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` against **Node.js 20 and 22**:
 
 1. **`npm ci`** — clean install from `package-lock.json` (stricter than `npm install` for reproducible builds).
-2. **`npm test`** — [Vitest](https://vitest.dev/) unit and HTTP tests. The GNews API is **not** called in CI: tests mock `axios`, so no API key is required in GitHub Actions.
-3. **`npm run build`** — TypeScript compile to `dist/`.
+2. **`npm run lint`** — [ESLint](https://eslint.org/) on `src/`, `test/`, and `vitest.config.ts`.
+3. **`npm test`** — [Vitest](https://vitest.dev/) unit and HTTP tests. The GNews API is **not** called in CI: tests mock `axios`, so no API key is required in GitHub Actions.
+4. **`npm run build`** — TypeScript compile to `dist/`.
 
 ## Local parity
 
@@ -14,6 +15,7 @@ From the repository root:
 
 ```bash
 npm ci
+npm run lint
 npm test
 npm run build
 ```
