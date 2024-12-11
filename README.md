@@ -83,6 +83,10 @@ Error responses use `{ "error": "message" }` with `4xx`/`5xx` as appropriate.
 
 For a diagram and error-handling notes, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
