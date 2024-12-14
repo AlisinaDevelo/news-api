@@ -1,9 +1,11 @@
 import express from "express";
 import routes from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
+import { securityHeaders } from "./middleware/security";
 
 const app = express();
 
+app.use(securityHeaders);
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
