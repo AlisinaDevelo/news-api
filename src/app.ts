@@ -3,9 +3,11 @@ import routes from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { securityHeaders } from "./middleware/security";
 import { apiRateLimiter } from "./middleware/rateLimit";
+import { applyTrustProxy } from "./middleware/trustProxy";
 
 const app = express();
 
+applyTrustProxy(app);
 app.use(securityHeaders);
 app.use(express.json());
 app.use(apiRateLimiter);
