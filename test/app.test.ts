@@ -1,18 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
+
+const { mockGet } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
+}));
+
+vi.mock("axios", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("axios")>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      get: mockGet,
+    },
+  };
+});
+
 import axios from "axios";
 import app from "../src/app";
 import { sampleArticles } from "./fixtures/articles";
 
-vi.mock("axios", () => ({
-  default: { get: vi.fn() },
-}));
-
-const mockedGet = vi.mocked(axios.get);
-
 describe("app", () => {
   beforeEach(() => {
-    mockedGet.mockReset();
+    mockGet.mockReset();
   });
 
   it("GET /health returns ok", async () => {
@@ -40,28 +50,29 @@ describe("app", () => {
   });
 
   it("GET /api/articles proxies gnews and returns articles", async () => {
-    mockedGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const res = await request(app).get("/api/articles?query=tech&count=2");
     expect(res.status).toBe(200);
     expect(res.body).toEqual(sampleArticles);
-    expect(mockedGet).toHaveBeenCalledWith(
+    expect(mockGet).toHaveBeenCalledWith(
       "https://gnews.io/api/v4/search",
       expect.objectContaining({
         params: expect.objectContaining({ q: "tech", max: 2 }),
+        timeout: expect.any(Number),
       })
     );
   });
 
   it("reuses cache for identical search params", async () => {
-    mockedGet.mockResolvedValue({ data: { articles: sampleArticles } });
+    mockGet.mockResolvedValue({ data: { articles: sampleArticles } });
     const q = `cached-${Math.random().toString(36).slice(2)}`;
     await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
     await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
-    expect(mockedGet).toHaveBeenCalledTimes(1);
+    expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
   it("GET /api/articles/title returns article when matched", async () => {
-    mockedGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const title = encodeURIComponent("Alpha headline");
     const res = await request(app).get(`/api/articles/title/${title}`);
     expect(res.status).toBe(200);
@@ -69,7 +80,7 @@ describe("app", () => {
   });
 
   it("GET /api/articles/title returns 404 when missing", async () => {
-    mockedGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const title = encodeURIComponent("Missing");
     const res = await request(app).get(`/api/articles/title/${title}`);
     expect(res.status).toBe(404);
@@ -82,7 +93,7 @@ describe("app", () => {
   });
 
   it("GET /api/articles/source filters by source name", async () => {
-    mockedGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const res = await request(app).get("/api/articles/source?source=BBC&count=10");
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
@@ -90,9 +101,23 @@ describe("app", () => {
   });
 
   it("returns 500 when upstream request fails", async () => {
-    mockedGet.mockRejectedValueOnce(new Error("network"));
+    mockGet.mockRejectedValueOnce(new Error("network"));
     const res = await request(app).get("/api/articles?query=fail&count=1");
     expect(res.status).toBe(500);
     expect(res.body.error).toBe("Internal server error");
+  });
+
+  it("returns 502 when axios errors", async () => {
+    mockGet.mockRejectedValueOnce(new axios.AxiosError("timeout"));
+    const res = await request(app).get("/api/articles?query=timeout&count=1");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("Upstream news service unavailable");
+  });
+
+  it("returns 502 when provider returns invalid payload", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: "not-array" } });
+    const res = await request(app).get("/api/articles?query=badpayload&count=1");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("Invalid response from news provider");
   });
 });
