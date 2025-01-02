@@ -1,11 +1,38 @@
 import "dotenv/config";
 import app from "./app";
 import { requireApiKeyUnlessTest } from "./config/env";
+import { logger } from "./logger";
 
 requireApiKeyUnlessTest();
 
 const PORT = Number(process.env.PORT) || 3000;
+const shutdownMs = Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 10_000);
+const shutdownTimeoutMs =
+  Number.isFinite(shutdownMs) && shutdownMs > 0 ? shutdownMs : 10_000;
 
-app.listen(PORT, () => {
-    console.log(`server running on ${PORT}!`);
+const server = app.listen(PORT, () => {
+  logger.info({ port: PORT }, "server listening");
+});
+
+function shutdown(signal: string) {
+  logger.info({ signal }, "shutdown signal received");
+  server.close((err) => {
+    if (err) {
+      logger.error({ err }, "error during server close");
+      process.exit(1);
+    }
+    logger.info("http server closed");
+    process.exit(0);
+  });
+  setTimeout(() => {
+    logger.error({ ms: shutdownTimeoutMs }, "forced exit after shutdown timeout");
+    process.exit(1);
+  }, shutdownTimeoutMs).unref();
+}
+
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM");
+});
+process.on("SIGINT", () => {
+  shutdown("SIGINT");
 });
