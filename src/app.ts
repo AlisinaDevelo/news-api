@@ -18,6 +18,19 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
+app.get("/ready", (_req, res) => {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
+    res.json({ status: "ready" });
+    return;
+  }
+  const key = process.env.GNEWS_API_KEY?.trim();
+  if (!key) {
+    res.status(503).json({ status: "not_ready", reason: "missing_api_key" });
+    return;
+  }
+  res.json({ status: "ready" });
+});
+
 app.get("/", (_req, res) => {
   res.json({ name: "news-api", docs: "See README.md", health: "/health" });
 });

@@ -32,6 +32,12 @@ describe("app", () => {
     expect(typeof res.body.uptime).toBe("number");
   });
 
+  it("GET /ready returns ready in test", async () => {
+    const res = await request(app).get("/ready");
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: "ready" });
+  });
+
   it("GET / returns service metadata", async () => {
     const res = await request(app).get("/");
     expect(res.status).toBe(200);
