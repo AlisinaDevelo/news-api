@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  title: news-api
+  description: REST API backed by the GNews search endpoint.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      operationId: getHealth
+      responses:
+        "200":
+          description: Process is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /ready:
+    get:
+      summary: Readiness probe
+      description: Returns 503 when `GNEWS_API_KEY` is not configured (non-test environments).
+      operationId: getReady
+      responses:
+        "200":
+          description: Ready to serve traffic
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyResponse"
+        "503":
+          description: Not ready (e.g. missing API key)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotReadyResponse"
+
+  /api/articles:
+    get:
+      summary: Search articles
+      operationId: searchArticles
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: count
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        "200":
+          description: Article list from provider (possibly cached)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Article"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          description: Rate limit exceeded
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/articles/title/{title}:
+    get:
+      summary: Find article by exact title
+      operationId: getArticleByTitle
+      parameters:
+        - name: title
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Article"
+        "404":
+          description: No article with that title in the search window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "429":
+          description: Rate limit exceeded
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/articles/source:
+    get:
+      summary: Filter articles by news source name
+      operationId: listArticlesBySource
+      parameters:
+        - name: source
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: count
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        "200":
+          description: Articles whose source name matches (case-insensitive)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Article"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          description: Rate limit exceeded
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  responses:
+    BadRequest:
+      description: Invalid or missing parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    BadGateway:
+      description: Upstream provider error or invalid provider payload
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    HealthResponse:
+      type: object
+      required: [status, uptime]
+      properties:
+        status:
+          type: string
+          example: ok
+        uptime:
+          type: number
+          format: double
+
+    ReadyResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ready
+
+    NotReadyResponse:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          example: not_ready
+        reason:
+          type: string
+          example: missing_api_key
+
+    ArticleSource:
+      type: object
+      required: [name, url]
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+
+    Article:
+      type: object
+      required: [title, url, publishedAt, source]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        content:
+          type: string
+          nullable: true
+        url:
+          type: string
+        image:
+          type: string
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+        source:
+          $ref: "#/components/schemas/ArticleSource"
