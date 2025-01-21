@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+coverage
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+README.md
+test
+vitest.config.ts
+eslint.config.mjs
