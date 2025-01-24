@@ -1,0 +1,12 @@
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      GNEWS_API_KEY: ${GNEWS_API_KEY:?set GNEWS_API_KEY in .env or shell}
+      PORT: "3000"
+      NODE_ENV: production
+      TRUST_PROXY: "0"
+      LOG_LEVEL: info
+    restart: unless-stopped
