@@ -1,21 +1,31 @@
 # news-api
 
-Small **Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Responses are cached in memory to cut duplicate upstream calls.
+**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Identical searches are served from an in-memory TTL cache to protect your quota and latency.
 
-**Highlights:** input validation, consistent JSON errors, `/health` for uptime checks, Vitest + Supertest tests (GNews mocked in CI), ESLint, and a [GitHub Actions](.github/workflows/ci.yml) pipeline on Node 20 and 22. See [docs/CI.md](docs/CI.md) for how the workflow maps to local commands.
+## Production-oriented features
+
+- **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting, optional `TRUST_PROXY` for correct client IPs behind a load balancer.
+- **Reliability:** Upstream HTTP timeouts, response validation, `502` for provider/transport failures, graceful shutdown on `SIGTERM` / `SIGINT`.
+- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id` on every response.
+- **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured).
+- **Supply chain:** `npm audit` in CI; lockfile-only installs.
+- **Contract:** [OpenAPI 3](docs/openapi.yaml).
+- **Container:** multi-stage [Dockerfile](Dockerfile) (non-root user, healthcheck).
+
+**Automation:** [GitHub Actions](.github/workflows/ci.yml) on Node **20** and **22** — lint, test, build, dependency audit, and Docker image build. Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security disclosures: [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
-- **Node.js** 20 or newer ([`engines`](package.json))
+- **Node.js** 20 or newer ([`engines`](package.json)), or Docker 24+
 - A **GNews API key** ([dashboard](https://gnews.io/dashboard))
 
-## Quick start
+## Quick start (Node)
 
 ```bash
 git clone https://github.com/<your-username>/news-api.git
 cd news-api
 cp .env.example .env
-# Edit .env: set GNEWS_API_KEY (and optional PORT)
+# Set GNEWS_API_KEY (and optional PORT)
 npm ci
 npm run lint
 npm test
@@ -29,25 +39,34 @@ Development with reload:
 npm run dev
 ```
 
+## Quick start (Docker)
+
+```bash
+docker build -t news-api:local .
+docker run --rm -p 3000:3000 -e GNEWS_API_KEY=your_key news-api:local
+```
+
+Or Compose (expects `GNEWS_API_KEY` in `.env`):
+
+```bash
+docker compose up --build
+```
+
 ## Environment
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GNEWS_API_KEY` | Yes (except in `NODE_ENV=test`) | Token from GNews. |
-| `PORT` | No | HTTP port. Default `3000`. |
-
-Never commit `.env`. Use `.env.example` as the template.
+Required and optional variables are listed in [`.env.example`](.env.example) and [docs/OPERATIONS.md](docs/OPERATIONS.md). Never commit `.env`.
 
 ## API
 
-Base path: `/api`.
+Base path: `/api`. Full schema: [docs/openapi.yaml](docs/openapi.yaml).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Liveness: `{ "status": "ok", "uptime": number }`. |
-| `GET` | `/api/articles` | Search articles. Query: `query` (required), `count` (optional, default 10, max 100). |
-| `GET` | `/api/articles/title/:title` | First article whose title exactly matches the URL-decoded `:title`, else `404`. |
-| `GET` | `/api/articles/source` | Articles whose `source.name` matches `source` (case-insensitive). Query: `source` (required), `count` optional. |
+| `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` missing (non-test). |
+| `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100). |
+| `GET` | `/api/articles/title/:title` | Exact title match in the current search window, else `404`. |
+| `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` optional. |
 
 **Examples**
 
@@ -57,31 +76,30 @@ GET /api/articles/title/Example%20Headline
 GET /api/articles/source?source=BBC&count=10
 ```
 
-Error responses use `{ "error": "message" }` with `4xx`/`5xx` as appropriate.
+Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit headers.
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `npm run dev` | Run `src/server.ts` via nodemon + ts-node. |
-| `npm run build` | Compile TypeScript to `dist/`. |
-| `npm start` | Run compiled `dist/server.js`. |
-| `npm test` | Run Vitest once. |
-| `npm run test:watch` | Vitest watch mode. |
-| `npm run test:coverage` | Tests + V8 coverage report. |
-| `npm run lint` | ESLint on `src/`, `test/`, `vitest.config.ts`. |
+| `npm run dev` | `nodemon` + `ts-node` on `src/server.ts`. |
+| `npm run build` | Compile to `dist/`. |
+| `npm start` | Run `dist/server.js`. |
+| `npm test` | Vitest once. |
+| `npm run test:watch` | Vitest watch. |
+| `npm run test:coverage` | Tests + coverage. |
+| `npm run lint` | ESLint. |
 
 ## Project layout
 
-- `src/app.ts` — Express app, `/health`, error middleware.
-- `src/server.ts` — Loads env, checks API key, listens for HTTP.
-- `src/routes.ts` — Route table.
-- `src/controllers/` — Request parsing and status codes.
-- `src/services/newsService.ts` — GNews client + cache keys.
-- `src/utils/cache.ts` — In-memory TTL cache (10 minutes).
-- `test/` — Vitest specs; HTTP tests use Supertest with mocked `axios`.
+- `src/app.ts` — Middleware stack, `/health`, `/ready`, `/api` mount.
+- `src/server.ts` — Env, API key check, HTTP server, graceful shutdown.
+- `src/logger.ts` — Pino + request logging.
+- `src/middleware/` — Security headers, rate limit, trust proxy, errors.
+- `src/services/newsService.ts` — GNews client, cache, timeouts.
+- `test/` — Vitest; HTTP tests mock `axios` (no live GNews in CI).
 
-For a diagram and error-handling notes, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Architecture diagram: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
