@@ -12,12 +12,14 @@ Add a valid `GNEWS_API_KEY` in `.env` when exercising the real API locally. Auto
 ## Before you open a PR
 
 ```bash
+npm audit --audit-level=high
 npm run lint
 npm test
 npm run build
+docker build .
 ```
 
-This matches what [CI](docs/CI.md) runs on Node 20 and 22.
+This matches what [CI](docs/CI.md) runs on Node 20 and 22 (plus the Docker job).
 
 ## Commits
 
