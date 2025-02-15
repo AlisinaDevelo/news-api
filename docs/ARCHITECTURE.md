@@ -12,7 +12,7 @@ flowchart LR
   NewsService --> GNews["GNews API"]
 ```
 
-1. **Express** (`src/app.ts`) parses JSON bodies and mounts `/api` routes.
+1. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **Helmet**, JSON body parser, **rate limiting** (skips `/health` and `/ready`), then mounts `/api` routes.
 2. **Controllers** validate query parameters and map domain results to HTTP status codes.
 3. **News service** builds cache keys from search query + `max`, returns cached arrays when present, otherwise calls GNews `/api/v4/search` via `axios`.
 4. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
