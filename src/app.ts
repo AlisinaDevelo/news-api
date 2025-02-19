@@ -32,7 +32,13 @@ app.get("/ready", (_req, res) => {
 });
 
 app.get("/", (_req, res) => {
-  res.json({ name: "news-api", docs: "See README.md", health: "/health" });
+  res.json({
+    name: "news-api",
+    readme: "README.md",
+    openapi: "/docs/openapi.yaml (repository file)",
+    health: "/health",
+    ready: "/ready",
+  });
 });
 
 app.use("/api", routes);
