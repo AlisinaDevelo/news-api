@@ -38,6 +38,13 @@ describe("app", () => {
     expect(res.body).toMatchObject({ status: "ready" });
   });
 
+  it("GET /openapi.yaml serves spec", async () => {
+    const res = await request(app).get("/openapi.yaml");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/yaml/);
+    expect(res.text).toContain("openapi:");
+  });
+
   it("GET / returns service metadata", async () => {
     const res = await request(app).get("/");
     expect(res.status).toBe(200);

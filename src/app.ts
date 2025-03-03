@@ -1,10 +1,15 @@
+import fs from "fs";
+import path from "path";
 import express from "express";
 import routes from "./routes";
+import { HttpError } from "./errors/HttpError";
 import { errorHandler } from "./middleware/errorHandler";
 import { securityHeaders } from "./middleware/security";
 import { apiRateLimiter } from "./middleware/rateLimit";
 import { applyTrustProxy } from "./middleware/trustProxy";
 import { httpLogger } from "./logger";
+
+const openApiFile = path.resolve(process.cwd(), "docs", "openapi.yaml");
 
 const app = express();
 
@@ -31,11 +36,24 @@ app.get("/ready", (_req, res) => {
   res.json({ status: "ready" });
 });
 
+app.get("/openapi.yaml", (_req, res, next) => {
+  if (!fs.existsSync(openApiFile)) {
+    next(new HttpError(404, "OpenAPI spec not found"));
+    return;
+  }
+  res.type("application/yaml");
+  res.sendFile(openApiFile, (err) => {
+    if (err) {
+      next(err);
+    }
+  });
+});
+
 app.get("/", (_req, res) => {
   res.json({
     name: "news-api",
     readme: "README.md",
-    openapi: "/docs/openapi.yaml (repository file)",
+    openapi: "/openapi.yaml",
     health: "/health",
     ready: "/ready",
   });
