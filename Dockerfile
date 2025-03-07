@@ -15,6 +15,7 @@ RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 --ingroup nodejs appuser
 COPY --from=build --chown=appuser:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=appuser:nodejs /app/dist ./dist
+COPY --chown=appuser:nodejs docs/openapi.yaml ./docs/openapi.yaml
 COPY --chown=appuser:nodejs package.json ./
 USER appuser
 EXPOSE 3000
