@@ -9,10 +9,11 @@
 - **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id` on every response.
 - **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured).
 - **Supply chain:** `npm audit` in CI; lockfile-only installs.
-- **Contract:** [OpenAPI 3](docs/openapi.yaml).
+- **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
 - **Container:** multi-stage [Dockerfile](Dockerfile) (non-root user, healthcheck).
+- **Deploy:** Example [Kubernetes manifests](deploy/k8s/).
 
-**Automation:** [GitHub Actions](.github/workflows/ci.yml) on Node **20** and **22** — lint, test, build, dependency audit, and Docker image build. Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security disclosures: [SECURITY.md](SECURITY.md).
+**Automation:** [GitHub Actions](.github/workflows/ci.yml) on Node **20** and **22** — audit, lint, test, **coverage artifact** (Node 22), build, and Docker image build. [Dependabot](.github/dependabot.yml) for npm and Actions. Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security: [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
@@ -58,12 +59,13 @@ Required and optional variables are listed in [`.env.example`](.env.example) and
 
 ## API
 
-Base path: `/api`. Full schema: [docs/openapi.yaml](docs/openapi.yaml).
+Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source file [docs/openapi.yaml](docs/openapi.yaml).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Liveness: `{ "status": "ok", "uptime": number }`. |
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` missing (non-test). |
+| `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
 | `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100). |
 | `GET` | `/api/articles/title/:title` | Exact title match in the current search window, else `404`. |
 | `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` optional. |
