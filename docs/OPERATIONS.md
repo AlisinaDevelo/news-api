@@ -20,6 +20,10 @@
 - **Liveness:** `GET /health` — process is up.
 - **Readiness:** `GET /ready` — `200` when `GNEWS_API_KEY` is set (non-test); `503` if not.
 
+## API contract
+
+- **`GET /openapi.yaml`** — served from `docs/openapi.yaml` relative to the process working directory. The production image sets `WORKDIR /app` and includes that file under `docs/openapi.yaml`.
+
 ## Scaling and cache
 
 The default cache is **in-memory** (`node-cache`). Multiple replicas do **not** share cache; each pod has its own TTL store. For a shared cache, introduce Redis (or another store) behind the service layer in a future revision.
