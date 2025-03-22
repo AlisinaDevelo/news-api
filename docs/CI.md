@@ -10,11 +10,16 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 2. **`npm audit --audit-level=high`** — fails the job if high or critical advisories remain.
 3. **`npm run lint`** — [ESLint](https://eslint.org/) on `src/`, `test/`, and `vitest.config.ts`.
 4. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions.
-5. **`npm run build`** — TypeScript compile to `dist/`.
+5. **`npm run test:coverage`** — **Node 22 only**; uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
+6. **`npm run build`** — TypeScript compile to `dist/`.
 
 ### Container (`docker` job)
 
-6. **`docker build .`** — Verifies the [Dockerfile](../Dockerfile) builds successfully (image is not pushed).
+7. **`docker build .`** — Verifies the [Dockerfile](../Dockerfile) builds successfully (image is not pushed).
+
+### Dependency updates
+
+[Dependabot](../.github/dependabot.yml) opens weekly PRs for npm and GitHub Actions.
 
 ## Local parity
 
@@ -27,11 +32,13 @@ npm run build
 docker build .
 ```
 
-Optional coverage:
+Coverage (matches the Node 22 CI step):
 
 ```bash
 npm run test:coverage
 ```
+
+Download the **`coverage-lcov`** artifact from a workflow run to inspect HTML/LCOV reports without running tests locally.
 
 ## Secrets and deployment
 
