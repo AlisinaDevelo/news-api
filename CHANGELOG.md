@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Dependabot for npm and GitHub Actions
+- CI coverage run (Node 22) with LCOV artifact upload
+- `GET /openapi.yaml` for live OpenAPI document
+- OpenAPI file bundled in Docker image
+- Example Kubernetes Deployment and Service under `deploy/k8s/`
+- `.editorconfig` for consistent formatting
+
 ## [1.0.0] — 2026-04-05
 
 ### Added
