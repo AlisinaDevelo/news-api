@@ -31,3 +31,7 @@ Keep commits focused. Short, imperative subject lines work well (for example: `f
 - **HTTP:** `test/app.test.ts` uses Supertest; `axios` is mocked so CI stays deterministic and keyless.
 
 When you change routes or validation, extend or add tests in the same change when possible.
+
+## Repository hygiene (GitHub UI)
+
+See [docs/GITHUB.md](docs/GITHUB.md) for suggested branch protection, secrets, and release practices.
