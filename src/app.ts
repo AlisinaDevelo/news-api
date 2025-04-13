@@ -8,6 +8,9 @@ import { securityHeaders } from "./middleware/security";
 import { apiRateLimiter } from "./middleware/rateLimit";
 import { applyTrustProxy } from "./middleware/trustProxy";
 import { httpLogger } from "./logger";
+import { metricsRequestObserver } from "./middleware/metricsHttp";
+import { clientApiKeyGate } from "./middleware/clientApiKey";
+import { register as metricsRegister } from "./metrics/register";
 
 const openApiFile = path.resolve(process.cwd(), "docs", "openapi.yaml");
 
@@ -15,6 +18,7 @@ const app = express();
 
 applyTrustProxy(app);
 app.use(httpLogger);
+app.use(metricsRequestObserver);
 app.use(securityHeaders);
 app.use(express.json());
 app.use(apiRateLimiter);
@@ -49,17 +53,27 @@ app.get("/openapi.yaml", (_req, res, next) => {
   });
 });
 
+app.get("/metrics", async (_req, res, next) => {
+  try {
+    res.setHeader("Content-Type", metricsRegister.contentType);
+    res.end(await metricsRegister.metrics());
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.get("/", (_req, res) => {
   res.json({
     name: "news-api",
     readme: "README.md",
     openapi: "/openapi.yaml",
+    metrics: "/metrics",
     health: "/health",
     ready: "/ready",
   });
 });
 
-app.use("/api", routes);
+app.use("/api", clientApiKeyGate, routes);
 
 app.use(errorHandler);
 

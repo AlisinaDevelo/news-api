@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 
 const { mockGet } = vi.hoisted(() => ({
@@ -49,6 +49,13 @@ describe("app", () => {
     const res = await request(app).get("/");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ name: "news-api" });
+  });
+
+  it("GET /metrics returns prometheus text", async () => {
+    const res = await request(app).get("/metrics");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/text/);
+    expect(res.text).toContain("http_requests_total");
   });
 
   it("GET /api/articles without query returns 400", async () => {
@@ -132,5 +139,29 @@ describe("app", () => {
     const res = await request(app).get("/api/articles?query=badpayload&count=1");
     expect(res.status).toBe(502);
     expect(res.body.error).toBe("Invalid response from news provider");
+  });
+});
+
+describe("CLIENT_API_KEYS gate", () => {
+  beforeEach(() => {
+    vi.stubEnv("CLIENT_API_KEYS", "secret-one");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns 401 for /api without X-API-Key", async () => {
+    const res = await request(app).get("/api/articles?query=x&count=1");
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe("Invalid or missing API key");
+  });
+
+  it("allows /api with valid X-API-Key", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const res = await request(app)
+      .get("/api/articles?query=x&count=1")
+      .set("X-API-Key", "secret-one");
+    expect(res.status).toBe(200);
   });
 });

@@ -13,7 +13,12 @@ function skipRateLimit(req: Request): boolean {
     return true;
   }
   const path = req.path ?? "";
-  return path === "/health" || path === "/ready" || path === "/openapi.yaml";
+  return (
+    path === "/health" ||
+    path === "/ready" ||
+    path === "/openapi.yaml" ||
+    path === "/metrics"
+  );
 }
 
 export const apiRateLimiter = rateLimit({
