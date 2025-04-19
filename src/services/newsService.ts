@@ -1,7 +1,7 @@
 import axios from "axios";
 import { Article } from "../types/article";
 import { HttpError } from "../errors/HttpError";
-import { getCache, setCache } from "../utils/cache";
+import { getCacheStore } from "../cache/store";
 import { UPSTREAM_TIMEOUT_MS } from "../config/upstream";
 
 const API_KEY = process.env.GNEWS_API_KEY;
@@ -21,7 +21,8 @@ function normalizeArticles(data: unknown): Article[] {
 
 export const fetchArticles = async (query: string, count: number): Promise<Article[]> => {
   const cacheKey = `${query}-${count}`;
-  const cached = getCache(cacheKey);
+  const store = getCacheStore();
+  const cached = await store.get(cacheKey);
   if (cached) {
     return cached as Article[];
   }
@@ -38,7 +39,7 @@ export const fetchArticles = async (query: string, count: number): Promise<Artic
     });
 
     const articles = normalizeArticles(response.data);
-    setCache(cacheKey, articles);
+    await store.set(cacheKey, articles);
     return articles;
   } catch (err) {
     if (axios.isAxiosError(err)) {

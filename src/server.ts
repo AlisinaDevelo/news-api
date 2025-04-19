@@ -1,5 +1,6 @@
 import "dotenv/config";
 import app from "./app";
+import { disconnectCacheStore } from "./cache/store";
 import { requireApiKeyUnlessTest } from "./config/env";
 import { logger } from "./logger";
 
@@ -17,12 +18,18 @@ const server = app.listen(PORT, () => {
 function shutdown(signal: string) {
   logger.info({ signal }, "shutdown signal received");
   server.close((err) => {
-    if (err) {
-      logger.error({ err }, "error during server close");
-      process.exit(1);
-    }
-    logger.info("http server closed");
-    process.exit(0);
+    void disconnectCacheStore()
+      .catch((e) => {
+        logger.error({ err: e }, "cache disconnect error");
+      })
+      .finally(() => {
+        if (err) {
+          logger.error({ err }, "error during server close");
+          process.exit(1);
+        }
+        logger.info("http server closed");
+        process.exit(0);
+      });
   });
   setTimeout(() => {
     logger.error({ ms: shutdownTimeoutMs }, "forced exit after shutdown timeout");
