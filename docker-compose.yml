@@ -1,6 +1,14 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
   api:
     build: .
+    depends_on:
+      - redis
     ports:
       - "3000:3000"
     environment:
@@ -9,4 +17,5 @@ services:
       NODE_ENV: production
       TRUST_PROXY: "0"
       LOG_LEVEL: info
+      REDIS_URL: redis://redis:6379
     restart: unless-stopped
