@@ -1,8 +1,10 @@
 openapi: 3.0.3
 info:
   title: news-api
-  description: REST API backed by the GNews search endpoint.
-  version: 1.0.0
+  description: |
+    REST API backed by the GNews search endpoint.
+    When `CLIENT_API_KEYS` is set on the server, send a matching `X-API-Key` header on `/api/*` requests.
+  version: 1.1.0
 servers:
   - url: http://localhost:3000
     description: Local development
@@ -39,11 +41,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotReadyResponse"
 
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Prometheus text / OpenMetrics exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /api/articles:
     get:
       summary: Search articles
       operationId: searchArticles
       parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Required when the server sets CLIENT_API_KEYS.
         - name: query
           in: query
           required: true
@@ -68,6 +88,8 @@ paths:
                   $ref: "#/components/schemas/Article"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "429":
           description: Rate limit exceeded
         "502":
@@ -80,6 +102,12 @@ paths:
       summary: Find article by exact title
       operationId: getArticleByTitle
       parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Required when the server sets CLIENT_API_KEYS.
         - name: title
           in: path
           required: true
@@ -92,6 +120,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Article"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           description: No article with that title in the search window
           content:
@@ -110,6 +140,12 @@ paths:
       summary: Filter articles by news source name
       operationId: listArticlesBySource
       parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Required when the server sets CLIENT_API_KEYS.
         - name: source
           in: query
           required: true
@@ -134,6 +170,8 @@ paths:
                   $ref: "#/components/schemas/Article"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "429":
           description: Rate limit exceeded
         "502":
@@ -143,6 +181,12 @@ paths:
 
 components:
   responses:
+    Unauthorized:
+      description: Missing or invalid X-API-Key when CLIENT_API_KEYS is configured
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
     BadRequest:
       description: Invalid or missing parameters
       content:
