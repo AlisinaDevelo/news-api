@@ -14,7 +14,7 @@ flowchart LR
 
 1. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **Helmet**, JSON body parser, **rate limiting** (skips `/health` and `/ready`), then mounts `/api` routes.
 2. **Controllers** validate query parameters and map domain results to HTTP status codes.
-3. **News service** builds cache keys from search query + `max`, returns cached arrays when present, otherwise calls GNews `/api/v4/search` via `axios`.
+3. **News service** builds cache keys from search query + `max`, reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), otherwise calls GNews `/api/v4/search` via `axios`.
 4. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
 
 ## Configuration
@@ -28,4 +28,4 @@ Unhandled promise rejections in async route handlers are forwarded by `asyncHand
 
 ## Caching
 
-`node-cache` stores article arrays per `query-count` key with a 600-second TTL (`src/utils/cache.ts`). Tuning TTL trades freshness for fewer upstream requests.
+Article arrays are stored per `query-count` key with a **600-second** TTL (`src/cache/store.ts`). Without `REDIS_URL`, `node-cache` is used; with `REDIS_URL`, **ioredis** stores JSON payloads for shared caches across replicas.

@@ -14,6 +14,8 @@
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window. |
 | `DISABLE_RATE_LIMIT` | `0` | Set to `1` to disable limiting (emergency only). |
 | `TRUST_PROXY` | `0` | Set to `1` behind a reverse proxy so rate limits use `X-Forwarded-For`. |
+| `REDIS_URL` | — | If set (e.g. `redis://localhost:6379`), article search results are cached in Redis with the same TTL as in-memory mode. Omit to use the in-process cache only. |
+| `CLIENT_API_KEYS` | — | Comma-separated secrets. When set, every `/api/*` request must send header `X-API-Key` matching one value. Omit to allow unauthenticated API access (still use network controls in production). |
 
 ## Probes
 
@@ -26,7 +28,10 @@
 
 ## Scaling and cache
 
-The default cache is **in-memory** (`node-cache`). Multiple replicas do **not** share cache; each pod has its own TTL store. For a shared cache, introduce Redis (or another store) behind the service layer in a future revision.
+- **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL). Each replica has its own entries.
+- **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
+
+On shutdown the server closes the Redis connection when that backend was used.
 
 ## Docker
 
