@@ -1,19 +1,19 @@
 # news-api
 
-**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Identical searches are served from an in-memory TTL cache to protect your quota and latency.
+**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Identical searches are cached (in-memory by default, or **Redis** when `REDIS_URL` is set) to protect quota and latency.
 
 ## Production-oriented features
 
-- **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting, optional `TRUST_PROXY` for correct client IPs behind a load balancer.
+- **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting, optional `TRUST_PROXY` for correct client IPs behind a load balancer, optional **`CLIENT_API_KEYS`** + `X-API-Key` on `/api/*`.
 - **Reliability:** Upstream HTTP timeouts, response validation, `502` for provider/transport failures, graceful shutdown on `SIGTERM` / `SIGINT`.
-- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id` on every response.
+- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, and **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format with default + HTTP counters).
 - **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured).
 - **Supply chain:** `npm audit` in CI; lockfile-only installs.
 - **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
 - **Container:** multi-stage [Dockerfile](Dockerfile) (non-root user, healthcheck).
 - **Deploy:** Example [Kubernetes manifests](deploy/k8s/).
 
-**Automation:** [GitHub Actions](.github/workflows/ci.yml) on Node **20** and **22** — audit, lint, test, **coverage artifact** (Node 22), build, and Docker image build. [Dependabot](.github/dependabot.yml) for npm and Actions. Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security: [SECURITY.md](SECURITY.md).
+**Automation:** [GitHub Actions](.github/workflows/ci.yml) on Node **20** and **22** — audit, lint, test, **coverage artifact** (Node 22), build, and Docker image build; [CodeQL](.github/workflows/codeql.yml) on `main`. [Dependabot](.github/dependabot.yml) for npm and Actions. Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security: [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
@@ -66,7 +66,8 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 | `GET` | `/health` | Liveness: `{ "status": "ok", "uptime": number }`. |
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` missing (non-test). |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
-| `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100). |
+| `GET` | `/metrics` | Prometheus metrics (skips rate limit). |
+| `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100). Optional header `X-API-Key` if `CLIENT_API_KEYS` is set. |
 | `GET` | `/api/articles/title/:title` | Exact title match in the current search window, else `404`. |
 | `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` optional. |
 
@@ -97,7 +98,9 @@ Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit hea
 - `src/app.ts` — Middleware stack, `/health`, `/ready`, `/api` mount.
 - `src/server.ts` — Env, API key check, HTTP server, graceful shutdown.
 - `src/logger.ts` — Pino + request logging.
-- `src/middleware/` — Security headers, rate limit, trust proxy, errors.
+- `src/middleware/` — Security headers, rate limit, trust proxy, metrics observer, optional client API key, errors.
+- `src/cache/store.ts` — Pluggable cache: memory or Redis.
+- `src/metrics/register.ts` — Prometheus registry.
 - `src/services/newsService.ts` — GNews client, cache, timeouts.
 - `test/` — Vitest; HTTP tests mock `axios` (no live GNews in CI).
 
