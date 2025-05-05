@@ -17,6 +17,10 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 
 7. **`docker build .`** — Verifies the [Dockerfile](../Dockerfile) builds successfully (image is not pushed).
 
+### Code scanning (`CodeQL` workflow)
+
+On pushes and PRs to `main`, plus a weekly schedule, [codeql.yml](../.github/workflows/codeql.yml) runs JavaScript analysis and uploads SARIF to the **Security** tab.
+
 ### Dependency updates
 
 [Dependabot](../.github/dependabot.yml) opens weekly PRs for npm and GitHub Actions.
