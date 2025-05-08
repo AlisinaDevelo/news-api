@@ -23,6 +23,7 @@ We aim to acknowledge reports within a few business days.
 - Run behind a reverse proxy with TLS termination in production.
 - Set `TRUST_PROXY=1` only when the proxy strips or sanitizes `X-Forwarded-For`.
 - Keep `GNEWS_API_KEY` in a secret store; never commit `.env`.
+- If you use `CLIENT_API_KEYS`, rotate them like any API credential; prefer a secret manager over plain Deployment env in production.
 - Tune `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, and `HTTP_TIMEOUT_MS` for your traffic profile.
 - Review [docs/OPERATIONS.md](docs/OPERATIONS.md) for runtime configuration.
 
