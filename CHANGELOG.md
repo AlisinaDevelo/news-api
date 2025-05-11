@@ -7,14 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-04-05
+
 ### Added
 
-- Dependabot for npm and GitHub Actions
-- CI coverage run (Node 22) with LCOV artifact upload
-- `GET /openapi.yaml` for live OpenAPI document
-- OpenAPI file bundled in Docker image
-- Example Kubernetes Deployment and Service under `deploy/k8s/`
-- `.editorconfig` for consistent formatting
+- Dependabot for npm and GitHub Actions; CI **coverage** artifact on Node 22 (LCOV)
+- **`GET /openapi.yaml`** for the live spec; OpenAPI file bundled in the Docker image
+- Example **Kubernetes** manifests under `deploy/k8s/`; `.editorconfig`
+- **CodeQL** workflow for `main`; pull request template; [GitHub settings guide](docs/GITHUB.md)
+- Prometheus **`GET /metrics`** (default process metrics + `http_requests_total`)
+- Optional **`CLIENT_API_KEYS`** enforcement via `X-API-Key` on `/api/*`
+- Optional **Redis** cache when `REDIS_URL` is set (`ioredis`); graceful disconnect on shutdown
+- Docker Compose **Redis** service and `REDIS_URL` for the API
+
+### Changed
+
+- Article cache moved to async `src/cache/store.ts` (memory or Redis); removed `src/utils/cache.ts`
+- OpenAPI spec version **1.1.0** with `/metrics` and client key documentation
 
 ## [1.0.0] — 2026-04-05
 
