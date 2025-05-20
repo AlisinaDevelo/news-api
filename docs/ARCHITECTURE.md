@@ -12,10 +12,11 @@ flowchart LR
   NewsService --> GNews["GNews API"]
 ```
 
-1. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **Helmet**, JSON body parser, **rate limiting** (skips `/health` and `/ready`), then mounts `/api` routes.
-2. **Controllers** validate query parameters and map domain results to HTTP status codes.
-3. **News service** builds cache keys from search query + `max`, reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), otherwise calls GNews `/api/v4/search` via `axios`.
-4. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
+1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented.
+2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`), then mounts `/api` routes.
+3. **Controllers** validate query parameters and map domain results to HTTP status codes.
+4. **News service** builds cache keys from search query + `max`, reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), otherwise calls GNews `/api/v4/search` via `axios`.
+5. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
 
 ## Configuration
 
