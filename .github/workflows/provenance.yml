@@ -1,0 +1,22 @@
+name: Provenance
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  attest-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/attest-build-provenance@v3
+        continue-on-error: true
+        with:
+          subject-path: package-lock.json
+          push-to-registry: false
