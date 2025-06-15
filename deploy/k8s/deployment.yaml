@@ -37,6 +37,18 @@ spec:
                 secretKeyRef:
                   name: news-api-secrets
                   key: gnews-api-key
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: news-api-secrets
+                  key: redis-url
+                  optional: true
+            - name: CLIENT_API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: news-api-secrets
+                  key: client-api-keys
+                  optional: true
           livenessProbe:
             httpGet:
               path: /health
