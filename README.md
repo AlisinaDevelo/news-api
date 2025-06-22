@@ -6,14 +6,14 @@
 
 - **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting, optional `TRUST_PROXY` for correct client IPs behind a load balancer, optional **`CLIENT_API_KEYS`** + `X-API-Key` on `/api/*`.
 - **Reliability:** Upstream HTTP timeouts, response validation, `502` for provider/transport failures, graceful shutdown on `SIGTERM` / `SIGINT`.
-- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, and **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format with default + HTTP counters).
+- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`).
 - **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured).
-- **Supply chain:** `npm audit` in CI; lockfile-only installs.
+- **Supply chain:** `npm audit` in CI; **SPDX SBOM** artifacts; Docker builds with **SBOM + provenance**; **dependency review** on PRs; optional **SLSA-style lockfile attestation** on `main`; lockfile-only installs.
 - **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
 - **Container:** multi-stage [Dockerfile](Dockerfile) (non-root user, healthcheck).
 - **Deploy:** Example [Kubernetes manifests](deploy/k8s/).
 
-**Automation:** [GitHub Actions](.github/workflows/ci.yml) on Node **20** and **22** — audit, lint, test, **coverage artifact** (Node 22), build, and Docker image build; [CodeQL](.github/workflows/codeql.yml) on `main`. [Dependabot](.github/dependabot.yml) for npm and Actions. Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security: [SECURITY.md](SECURITY.md).
+**Automation:** [CI](.github/workflows/ci.yml) (Node **20**/**22**), [CodeQL](.github/workflows/codeql.yml), [Codecov](https://codecov.io) upload, [dependency review](.github/workflows/dependency-review.yml), [SBOM](.github/workflows/supply-chain.yml), [provenance attest](.github/workflows/provenance.yml), [releases on tags](.github/workflows/release.yml), and [Dependabot](.github/dependabot.yml) (npm, Docker, Actions). Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security: [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
@@ -97,6 +97,7 @@ Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit hea
 
 - `src/app.ts` — Middleware stack, `/health`, `/ready`, `/api` mount.
 - `src/server.ts` — Env, API key check, HTTP server, graceful shutdown.
+- `src/tracing.ts` / `src/otel-bootstrap.ts` — Optional OpenTelemetry (before Express loads).
 - `src/logger.ts` — Pino + request logging.
 - `src/middleware/` — Security headers, rate limit, trust proxy, metrics observer, optional client API key, errors.
 - `src/cache/store.ts` — Pluggable cache: memory or Redis.
