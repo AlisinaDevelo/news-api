@@ -7,8 +7,8 @@ These settings are applied in the GitHub UI (not in git). They mirror common ent
 Suggested rules:
 
 - Require a pull request before merging (at least one review for teams; solo maintainers may use zero).
-- Require status checks to pass before merging:
-  - `test (20)`, `test (22)`, `docker`, `CodeQL` (when enabled), and any other required workflows.
+- Require status checks to pass before merging (exact names depend on GitHub’s UI):
+  - `test` matrix jobs for Node 20 and 22, `docker`, `CodeQL`, `sbom`, `dependency-review` (PRs), `attest-lockfile` (`main`), and any other workflows you enable.
 - Require branches to be up to date before merging.
 - Do not allow bypassing the above for administrators unless you intentionally want break-glass access.
 
