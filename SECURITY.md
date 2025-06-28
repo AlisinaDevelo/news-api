@@ -30,3 +30,9 @@ We aim to acknowledge reports within a few business days.
 ## Dependency audits
 
 CI runs `npm audit` on every push. Run `npm audit` locally before releases.
+
+## SBOM and attestations
+
+- Workflow artifacts include an **SPDX** JSON SBOM from [Anchore SBOM Action](https://github.com/anchore/sbom-action).
+- The **Provenance** workflow attempts a GitHub **build attestation** for `package-lock.json` (requires a plan that supports attestations; the job is best-effort).
+- **Codecov** uploads require optional secret `CODECOV_TOKEN` on private repositories.
