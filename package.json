@@ -1,6 +1,6 @@
 {
   "name": "news-api",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "REST API for news search using the GNews API",
   "main": "dist/server.js",
   "engines": {

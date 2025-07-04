@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-04-05
+
+### Added
+
+- **OpenTelemetry** tracing to OTLP (`src/tracing.ts`, `src/otel-bootstrap.ts`) with graceful shutdown
+- **Codecov** upload from CI (optional `CODECOV_TOKEN`)
+- Docker **Buildx** builds with **SBOM** and **provenance** in CI
+- **Dependency review** workflow for pull requests
+- **Supply chain** workflow with SPDX SBOM artifact (Anchore)
+- **Provenance** workflow: build attestation for `package-lock.json` on `main` (best-effort)
+- **Release** workflow: GitHub Release on `v*.*.*` tags
+- Kubernetes **Redis** manifest, **`secret.example.yaml`**, optional `REDIS_URL` / `CLIENT_API_KEYS` env from Secret on Deployment
+- **Dependabot** updates for Docker base images
+
+### Changed
+
+- Documentation for CI, GitHub branch checks, security (SBOM/attestations), operations (OTel env), and K8s deploy flow
+- OpenAPI document version **1.2.0**
+
 ## [1.1.0] — 2026-04-05
 
 ### Added

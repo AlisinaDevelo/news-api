@@ -4,7 +4,7 @@ info:
   description: |
     REST API backed by the GNews search endpoint.
     When `CLIENT_API_KEYS` is set on the server, send a matching `X-API-Key` header on `/api/*` requests.
-  version: 1.1.0
+  version: 1.2.0
 servers:
   - url: http://localhost:3000
     description: Local development
