@@ -83,11 +83,55 @@ describe("app", () => {
     );
   });
 
+  it("GET /api/articles forwards validated search filters", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const res = await request(app).get(
+      "/api/articles?query=tech&count=2&lang=EN&country=us&from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z&sortBy=relevance"
+    );
+    expect(res.status).toBe(200);
+    expect(mockGet).toHaveBeenCalledWith(
+      "https://gnews.io/api/v4/search",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          q: "tech",
+          max: 2,
+          lang: "en",
+          country: "us",
+          from: "2026-01-01T00:00:00.000Z",
+          to: "2026-01-02T00:00:00.000Z",
+          sortby: "relevance",
+        }),
+      })
+    );
+  });
+
+  it("GET /api/articles rejects invalid search filters", async () => {
+    const invalidLang = await request(app).get("/api/articles?query=tech&lang=eng");
+    expect(invalidLang.status).toBe(400);
+
+    const invalidRange = await request(app).get(
+      "/api/articles?query=tech&from=2026-01-02T00:00:00Z&to=2026-01-01T00:00:00Z"
+    );
+    expect(invalidRange.status).toBe(400);
+  });
+
   it("reuses cache for identical search params", async () => {
     mockGet.mockResolvedValue({ data: { articles: sampleArticles } });
     const q = `cached-${Math.random().toString(36).slice(2)}`;
     await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
     await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("normalizes search params before caching", async () => {
+    mockGet.mockResolvedValue({ data: { articles: sampleArticles } });
+    const q = `normalized-${Math.random().toString(36).slice(2)}`;
+    await request(app).get(
+      `/api/articles?query=${encodeURIComponent(q)}&count=2&lang=EN&country=US&from=2026-01-01T00:00:00Z`
+    );
+    await request(app).get(
+      `/api/articles?query=${encodeURIComponent(q)}&count=2&lang=en&country=us&from=2026-01-01T00:00:00.000Z`
+    );
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
 

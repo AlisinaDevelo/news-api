@@ -4,12 +4,17 @@ import {
   fetchArticlesBySource,
   fetchArticlesByTitle,
 } from "../services/newsService";
-import { parseArticleCount, requireQueryString } from "../utils/validation";
+import {
+  parseArticleCount,
+  parseArticleSearchFilters,
+  requireQueryString,
+} from "../utils/validation";
 
 export const getArticles = async (req: Request, res: Response): Promise<void> => {
   const q = requireQueryString(req.query.query, "query");
   const count = parseArticleCount(req.query.count);
-  const articles = await fetchArticles(q, count);
+  const filters = parseArticleSearchFilters(req.query);
+  const articles = await fetchArticles({ query: q, count, ...filters });
   res.json(articles);
 };
 
@@ -26,6 +31,7 @@ export const getArticlesByTitle = async (req: Request, res: Response): Promise<v
 export const getArticlesBySource = async (req: Request, res: Response): Promise<void> => {
   const source = requireQueryString(req.query.source, "source");
   const count = parseArticleCount(req.query.count);
-  const articles = await fetchArticlesBySource(source, count);
+  const filters = parseArticleSearchFilters(req.query);
+  const articles = await fetchArticlesBySource(source, count, filters);
   res.json(articles);
 };

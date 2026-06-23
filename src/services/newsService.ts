@@ -3,6 +3,7 @@ import { Article } from "../types/article";
 import { HttpError } from "../errors/HttpError";
 import { getCacheStore } from "../cache/store";
 import { UPSTREAM_TIMEOUT_MS } from "../config/upstream";
+import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 
 const API_KEY = process.env.GNEWS_API_KEY;
 const BASE_URL = "https://gnews.io/api/v4";
@@ -19,8 +20,33 @@ function normalizeArticles(data: unknown): Article[] {
   return (data as { articles: Article[] }).articles;
 }
 
-export const fetchArticles = async (query: string, count: number): Promise<Article[]> => {
-  const cacheKey = `${query}-${count}`;
+function searchCacheKey(options: ArticleSearchOptions): string {
+  return JSON.stringify({
+    query: options.query,
+    count: options.count,
+    lang: options.lang ?? null,
+    country: options.country ?? null,
+    from: options.from ?? null,
+    to: options.to ?? null,
+    sortBy: options.sortBy ?? null,
+  });
+}
+
+function toProviderParams(options: ArticleSearchOptions): Record<string, string | number | undefined> {
+  return {
+    q: options.query,
+    max: options.count,
+    token: API_KEY,
+    lang: options.lang,
+    country: options.country,
+    from: options.from,
+    to: options.to,
+    sortby: options.sortBy,
+  };
+}
+
+export const fetchArticles = async (options: ArticleSearchOptions): Promise<Article[]> => {
+  const cacheKey = searchCacheKey(options);
   const store = getCacheStore();
   const cached = await store.get(cacheKey);
   if (cached) {
@@ -29,11 +55,7 @@ export const fetchArticles = async (query: string, count: number): Promise<Artic
 
   try {
     const response = await axios.get<{ articles: Article[] }>(`${BASE_URL}/search`, {
-      params: {
-        q: query,
-        max: count,
-        token: API_KEY,
-      },
+      params: toProviderParams(options),
       timeout: UPSTREAM_TIMEOUT_MS,
       validateStatus: (s) => s >= 200 && s < 300,
     });
@@ -50,15 +72,16 @@ export const fetchArticles = async (query: string, count: number): Promise<Artic
 };
 
 export const fetchArticlesByTitle = async (title: string): Promise<Article | undefined> => {
-  const articles = await fetchArticles(title, 10);
+  const articles = await fetchArticles({ query: title, count: 10 });
   return articles.find((article) => article.title === title);
 };
 
 export const fetchArticlesBySource = async (
   sourceName: string,
-  count: number
+  count: number,
+  filters: ArticleSearchFilters = {}
 ): Promise<Article[]> => {
-  const articles = await fetchArticles(sourceName, count);
+  const articles = await fetchArticles({ query: sourceName, count, ...filters });
   const target = sourceName.toLowerCase();
   return articles.filter((article) => article.source.name.toLowerCase() === target);
 };
