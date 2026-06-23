@@ -77,6 +77,41 @@ paths:
             minimum: 1
             maximum: 100
             default: 10
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^[a-zA-Z]{2}$"
+          description: Two-letter article language code.
+        - name: country
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^[a-zA-Z]{2}$"
+          description: Two-letter source country code.
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Include articles published at or after this ISO 8601 timestamp.
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Include articles published at or before this ISO 8601 timestamp.
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [publishedAt, relevance]
+          description: Provider sort order. Forwarded to GNews as `sortby`.
       responses:
         "200":
           description: Article list from provider (possibly cached)
@@ -159,6 +194,41 @@ paths:
             minimum: 1
             maximum: 100
             default: 10
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^[a-zA-Z]{2}$"
+          description: Two-letter article language code.
+        - name: country
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: "^[a-zA-Z]{2}$"
+          description: Two-letter source country code.
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Include articles published at or after this ISO 8601 timestamp.
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Include articles published at or before this ISO 8601 timestamp.
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [publishedAt, relevance]
+          description: Provider sort order. Forwarded to GNews as `sortby`.
       responses:
         "200":
           description: Articles whose source name matches (case-insensitive)

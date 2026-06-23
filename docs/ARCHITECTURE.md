@@ -15,7 +15,7 @@ flowchart LR
 1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented.
 2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`), then mounts `/api` routes.
 3. **Controllers** validate query parameters and map domain results to HTTP status codes.
-4. **News service** builds cache keys from search query + `max`, reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), otherwise calls GNews `/api/v4/search` via `axios`.
+4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), otherwise calls GNews `/api/v4/search` via `axios`.
 5. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
 
 ## Configuration
@@ -29,4 +29,8 @@ Unhandled promise rejections in async route handlers are forwarded by `asyncHand
 
 ## Caching
 
-Article arrays are stored per `query-count` key with a **600-second** TTL (`src/cache/store.ts`). Without `REDIS_URL`, `node-cache` is used; with `REDIS_URL`, **ioredis** stores JSON payloads for shared caches across replicas.
+Article arrays are stored per normalized search key with a **600-second** TTL (`src/cache/store.ts`). Without `REDIS_URL`, `node-cache` is used; with `REDIS_URL`, **ioredis** stores JSON payloads for shared caches across replicas.
+
+## Metrics
+
+`src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts, while `newsService` records cache hits/misses, upstream request outcomes, and upstream latency buckets.

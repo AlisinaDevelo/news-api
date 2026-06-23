@@ -34,8 +34,22 @@
 
 - **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL). Each replica has its own entries.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
+- Cache keys include normalized search parameters: query, count, `lang`, `country`, `from`, `to`, and `sortBy`.
 
 On shutdown the server closes the Redis connection when that backend was used.
+
+## Metrics
+
+`GET /metrics` exposes default Node.js process metrics plus application metrics:
+
+| Metric | Labels | Purpose |
+|--------|--------|---------|
+| `http_requests_total` | `method`, `status_code` | HTTP response count. |
+| `news_cache_events_total` | `result=hit|miss` | Cache lookup behavior for article searches. |
+| `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
+| `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload` | GNews provider request latency histogram. |
+
+Use cache hit rate to understand quota protection, and upstream latency/error metrics to separate provider trouble from local API trouble.
 
 ## Docker
 
