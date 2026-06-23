@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Optional search filters for `lang`, `country`, `from`, `to`, and `sortBy`, with validation and normalized cache keys.
 - Prometheus metrics for article-search cache hit/miss behavior and upstream provider request latency/outcomes.
+- Curl-based `npm run smoke` check for a running instance.
 
 ## [1.2.0] — 2026-04-05
 

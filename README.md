@@ -40,6 +40,14 @@ Development with reload:
 npm run dev
 ```
 
+Smoke-test a running instance:
+
+```bash
+BASE_URL=http://localhost:3000 QUERY=postgres npm run smoke
+# If CLIENT_API_KEYS is configured on the server:
+CLIENT_API_KEY=client-secret-one npm run smoke
+```
+
 ## Quick start (Docker)
 
 ```bash
@@ -96,6 +104,7 @@ Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit hea
 | `npm run test:watch` | Vitest watch. |
 | `npm run test:coverage` | Tests + coverage. |
 | `npm run lint` | ESLint. |
+| `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, optional `CLIENT_API_KEY`). |
 
 ## Project layout
 

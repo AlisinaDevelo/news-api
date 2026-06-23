@@ -64,6 +64,22 @@ Or with Compose (requires `GNEWS_API_KEY` in `.env`):
 docker compose up --build
 ```
 
+## Smoke test
+
+After the service is running and ready, run:
+
+```bash
+BASE_URL=http://localhost:3000 QUERY=postgres npm run smoke
+```
+
+If `CLIENT_API_KEYS` is configured, pass a matching client key:
+
+```bash
+CLIENT_API_KEY=client-secret-one npm run smoke
+```
+
+The smoke test checks `/health`, `/ready`, `/openapi.yaml`, `/api/articles`, and `/metrics`.
+
 ## Logs
 
 Logs are **JSON** (Pino). Each response includes an `x-request-id` header for correlation.
