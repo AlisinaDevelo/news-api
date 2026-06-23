@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prometheus metrics for article-search cache hit/miss behavior and upstream provider request latency/outcomes.
 - Curl-based `npm run smoke` check for a running instance.
 
+### Security
+
+- Refreshed the dependency lockfile and upgraded OpenTelemetry packages; `npm audit --omit=dev` reports zero vulnerabilities.
+
 ## [1.2.0] — 2026-04-05
 
 ### Added
