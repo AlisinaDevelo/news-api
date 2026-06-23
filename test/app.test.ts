@@ -135,6 +135,22 @@ describe("app", () => {
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
+  it("records cache and upstream metrics for article searches", async () => {
+    mockGet.mockResolvedValue({ data: { articles: sampleArticles } });
+    const q = `metrics-${Math.random().toString(36).slice(2)}`;
+    await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+    await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    const res = await request(app).get("/metrics");
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('news_cache_events_total{result="miss"}');
+    expect(res.text).toContain('news_cache_events_total{result="hit"}');
+    expect(res.text).toContain('news_upstream_requests_total{outcome="success"}');
+    expect(res.text).toContain(
+      'news_upstream_request_duration_seconds_bucket{le="0.05",outcome="success"}'
+    );
+  });
+
   it("GET /api/articles/title returns article when matched", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const title = encodeURIComponent("Alpha headline");

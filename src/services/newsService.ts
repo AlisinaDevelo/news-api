@@ -4,6 +4,11 @@ import { HttpError } from "../errors/HttpError";
 import { getCacheStore } from "../cache/store";
 import { UPSTREAM_TIMEOUT_MS } from "../config/upstream";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
+import {
+  cacheEventsTotal,
+  upstreamRequestDurationSeconds,
+  upstreamRequestsTotal,
+} from "../metrics/register";
 
 const API_KEY = process.env.GNEWS_API_KEY;
 const BASE_URL = "https://gnews.io/api/v4";
@@ -50,9 +55,13 @@ export const fetchArticles = async (options: ArticleSearchOptions): Promise<Arti
   const store = getCacheStore();
   const cached = await store.get(cacheKey);
   if (cached) {
+    cacheEventsTotal.inc({ result: "hit" });
     return cached as Article[];
   }
+  cacheEventsTotal.inc({ result: "miss" });
 
+  const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
+  let articles: Article[];
   try {
     const response = await axios.get<{ articles: Article[] }>(`${BASE_URL}/search`, {
       params: toProviderParams(options),
@@ -60,15 +69,22 @@ export const fetchArticles = async (options: ArticleSearchOptions): Promise<Arti
       validateStatus: (s) => s >= 200 && s < 300,
     });
 
-    const articles = normalizeArticles(response.data);
-    await store.set(cacheKey, articles);
-    return articles;
+    articles = normalizeArticles(response.data);
+    upstreamRequestsTotal.inc({ outcome: "success" });
+    stopUpstreamTimer({ outcome: "success" });
   } catch (err) {
+    const outcome =
+      err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
+    upstreamRequestsTotal.inc({ outcome });
+    stopUpstreamTimer({ outcome });
     if (axios.isAxiosError(err)) {
       throw new HttpError(502, "Upstream news service unavailable");
     }
     throw err;
   }
+
+  await store.set(cacheKey, articles);
+  return articles;
 };
 
 export const fetchArticlesByTitle = async (title: string): Promise<Article | undefined> => {
