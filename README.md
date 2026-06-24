@@ -2,6 +2,18 @@
 
 **Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Searches support provider-backed filters for language, country, date range, and sort order. Identical normalized searches are cached (in-memory by default, or **Redis** when `REDIS_URL` is set) to protect quota and latency. The upstream base URL is injectable for deterministic local integration tests and benchmarks.
 
+## How a request flows
+
+A search runs through a small, explicit pipeline — each stage is a separate, testable unit:
+
+1. **Validate** — query params are checked before any network call: `query` is required, `count` is clamped (≤100), `lang`/`country` must be ISO two-letter codes, `from`/`to` must parse as ISO 8601, and `sortBy` ∈ {`publishedAt`, `relevance`}. Bad input fails fast with `400` instead of wasting an upstream call or quota.
+2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set), so identical searches share a single upstream call across replicas.
+3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502` rather than a hung request.
+4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss, upstream outcome, latency histogram), and optional OpenTelemetry spans.
+5. **Respond** — results are returned (or narrowed in memory for the title/source endpoints), with consistent `{ "error": "..." }` failures and standard rate-limit headers.
+
+Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Production-oriented features
 
 - **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting, optional `TRUST_PROXY` for correct client IPs behind a load balancer, optional **`CLIENT_API_KEYS`** + `X-API-Key` on `/api/*`.
