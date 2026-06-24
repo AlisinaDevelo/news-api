@@ -81,6 +81,16 @@ CLIENT_API_KEY=client-secret-one npm run smoke
 
 The smoke test checks `/health`, `/ready`, `/openapi.yaml`, `/api/articles`, and `/metrics`.
 
+## Local Benchmark
+
+For reproducible cache/upstream performance checks without a live GNews key:
+
+```bash
+npm run benchmark:local
+```
+
+See [BENCHMARKS.md](BENCHMARKS.md) for methodology and tuning variables.
+
 ## Logs
 
 Logs are **JSON** (Pino). Each response includes an `x-request-id` header for correlation.

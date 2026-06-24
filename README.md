@@ -48,6 +48,12 @@ BASE_URL=http://localhost:3000 QUERY=postgres npm run smoke
 CLIENT_API_KEY=client-secret-one npm run smoke
 ```
 
+Run the deterministic local benchmark:
+
+```bash
+npm run benchmark:local
+```
+
 ## Quick start (Docker)
 
 ```bash
@@ -105,6 +111,7 @@ Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit hea
 | `npm run test:coverage` | Tests + coverage. |
 | `npm run lint` | ESLint. |
 | `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, optional `CLIENT_API_KEY`). |
+| `npm run benchmark:local` | Builds the app, starts a fake GNews provider, and measures cold searches vs warm cache hits. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md). |
 
 ## Project layout
 
