@@ -18,6 +18,13 @@ export const cacheEventsTotal = new Counter({
   registers: [register],
 });
 
+export const cacheErrorsTotal = new Counter({
+  name: "news_cache_errors_total",
+  help: "Total news search cache errors by operation",
+  labelNames: ["operation"],
+  registers: [register],
+});
+
 export const upstreamRequestsTotal = new Counter({
   name: "news_upstream_requests_total",
   help: "Total upstream news provider requests by outcome",

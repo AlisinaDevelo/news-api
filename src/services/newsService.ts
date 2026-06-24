@@ -1,16 +1,19 @@
 import axios from "axios";
 import { Article } from "../types/article";
 import { HttpError } from "../errors/HttpError";
-import { getCacheStore } from "../cache/store";
+import { CacheStore, getCacheStore } from "../cache/store";
 import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 import {
+  cacheErrorsTotal,
   cacheEventsTotal,
   upstreamRequestDurationSeconds,
   upstreamRequestsTotal,
 } from "../metrics/register";
+import { logger } from "../logger";
 
 const API_KEY = process.env.GNEWS_API_KEY;
+const inFlightSearches = new Map<string, Promise<Article[]>>();
 
 function normalizeArticles(data: unknown): Article[] {
   if (
@@ -49,16 +52,45 @@ function toProviderParams(options: ArticleSearchOptions): Record<string, string 
   };
 }
 
-export const fetchArticles = async (options: ArticleSearchOptions): Promise<Article[]> => {
-  const cacheKey = searchCacheKey(options);
-  const store = getCacheStore();
-  const cached = await store.get(cacheKey);
-  if (cached) {
-    cacheEventsTotal.inc({ result: "hit" });
-    return cached as Article[];
+async function readCachedArticles(
+  store: CacheStore,
+  cacheKey: string
+): Promise<Article[] | undefined> {
+  try {
+    const cached = await store.get(cacheKey);
+    if (cached !== undefined) {
+      cacheEventsTotal.inc({ result: "hit" });
+      return cached as Article[];
+    }
+  } catch (err) {
+    cacheEventsTotal.inc({ result: "error" });
+    cacheErrorsTotal.inc({ operation: "get" });
+    logger.warn({ err }, "cache get failed; falling through to upstream");
+    return undefined;
   }
-  cacheEventsTotal.inc({ result: "miss" });
 
+  cacheEventsTotal.inc({ result: "miss" });
+  return undefined;
+}
+
+async function writeCachedArticles(
+  store: CacheStore,
+  cacheKey: string,
+  articles: Article[]
+): Promise<void> {
+  try {
+    await store.set(cacheKey, articles);
+  } catch (err) {
+    cacheErrorsTotal.inc({ operation: "set" });
+    logger.warn({ err }, "cache set failed; returning upstream response without caching");
+  }
+}
+
+async function fetchArticlesFromUpstream(
+  options: ArticleSearchOptions,
+  store: CacheStore,
+  cacheKey: string
+): Promise<Article[]> {
   const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
   let articles: Article[];
   try {
@@ -82,8 +114,31 @@ export const fetchArticles = async (options: ArticleSearchOptions): Promise<Arti
     throw err;
   }
 
-  await store.set(cacheKey, articles);
+  await writeCachedArticles(store, cacheKey, articles);
   return articles;
+}
+
+export const fetchArticles = async (options: ArticleSearchOptions): Promise<Article[]> => {
+  const cacheKey = searchCacheKey(options);
+  const store = getCacheStore();
+  const cached = await readCachedArticles(store, cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const existing = inFlightSearches.get(cacheKey);
+  if (existing) {
+    cacheEventsTotal.inc({ result: "coalesced" });
+    return existing;
+  }
+
+  const search = fetchArticlesFromUpstream(options, store, cacheKey);
+  inFlightSearches.set(cacheKey, search);
+  try {
+    return await search;
+  } finally {
+    inFlightSearches.delete(cacheKey);
+  }
 };
 
 export const fetchArticlesByTitle = async (title: string): Promise<Article | undefined> => {

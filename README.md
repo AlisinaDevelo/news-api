@@ -7,7 +7,7 @@
 A search runs through a small, explicit pipeline — each stage is a separate, testable unit:
 
 1. **Validate** — query params are checked before any network call: `query` is required, `count` is clamped (≤100), `lang`/`country` must be ISO two-letter codes, `from`/`to` must parse as ISO 8601, and `sortBy` ∈ {`publishedAt`, `relevance`}. Bad input fails fast with `400` instead of wasting an upstream call or quota.
-2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set), so identical searches share a single upstream call across replicas.
+2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set). Cache failures are logged/metriced but do not fail article requests; identical in-flight misses in the same process share one upstream call.
 3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502` rather than a hung request.
 4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss, upstream outcome, latency histogram), and optional OpenTelemetry spans.
 5. **Respond** — results are returned (or narrowed in memory for the title/source endpoints), with consistent `{ "error": "..." }` failures and standard rate-limit headers.
@@ -18,7 +18,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 
 - **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting, optional `TRUST_PROXY` for correct client IPs behind a load balancer, optional **`CLIENT_API_KEYS`** + `X-API-Key` on `/api/*`.
 - **Reliability:** Upstream HTTP timeouts, response validation, `502` for provider/transport failures, graceful shutdown on `SIGTERM` / `SIGINT`.
-- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss + upstream latency metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`).
+- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss/error/coalescing + upstream latency metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`).
 - **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured).
 - **Supply chain:** `npm audit` in CI; **SPDX SBOM** artifacts; Docker builds with **SBOM + provenance**; **dependency review** on PRs; optional **SLSA-style lockfile attestation** on `main`; lockfile-only installs.
 - **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
@@ -92,7 +92,7 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 | `GET` | `/health` | Liveness: `{ "status": "ok", "uptime": number }`. |
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` missing (non-test). |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
-| `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, cache hit/miss counts, and upstream latency. |
+| `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, cache hit/miss/error/coalescing counts, and upstream latency. |
 | `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100), plus optional `lang`, `country`, `from`, `to`, `sortBy`. Optional header `X-API-Key` if `CLIENT_API_KEYS` is set. |
 | `GET` | `/api/articles/title/:title` | Exact title match in the current search window, else `404`. |
 | `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` optional, plus optional `lang`, `country`, `from`, `to`, `sortBy`. |
@@ -134,7 +134,7 @@ Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit hea
 - `src/middleware/` — Security headers, rate limit, trust proxy, metrics observer, optional client API key, errors.
 - `src/cache/store.ts` — Pluggable cache: memory or Redis.
 - `src/metrics/register.ts` — Prometheus registry: HTTP, cache, and upstream provider metrics.
-- `src/services/newsService.ts` — GNews client, normalized cache keys, timeouts, upstream instrumentation.
+- `src/services/newsService.ts` — GNews client, normalized cache keys, cache resilience/coalescing, timeouts, upstream instrumentation.
 - `test/` — Vitest; HTTP tests mock `axios` (no live GNews in CI).
 
 Architecture diagram: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Release notes: [CHANGELOG.md](CHANGELOG.md).

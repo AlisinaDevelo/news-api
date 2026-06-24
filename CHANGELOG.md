@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Curl-based `npm run smoke` check for a running instance.
 - Configurable `GNEWS_BASE_URL` for deterministic local integration tests and benchmarks.
 - Deterministic `npm run benchmark:local` benchmark for cold upstream-backed searches and warm cache hits.
+- Cache resilience for article searches: cache read/write failures are logged and metriced without failing requests.
+- In-flight coalescing for identical cache misses so concurrent same-key searches share one upstream request per process.
 
 ### Security
 

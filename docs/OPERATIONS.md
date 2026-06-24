@@ -36,6 +36,8 @@
 - **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL). Each replica has its own entries.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
 - Cache keys include normalized search parameters: query, count, `lang`, `country`, `from`, `to`, and `sortBy`.
+- Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, the service logs a warning, increments cache error metrics, falls through to GNews on read failure, and still returns the upstream response on write failure.
+- Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
 
 On shutdown the server closes the Redis connection when that backend was used.
 
@@ -46,11 +48,12 @@ On shutdown the server closes the Redis connection when that backend was used.
 | Metric | Labels | Purpose |
 |--------|--------|---------|
 | `http_requests_total` | `method`, `status_code` | HTTP response count. |
-| `news_cache_events_total` | `result=hit|miss` | Cache lookup behavior for article searches. |
+| `news_cache_events_total` | `result=hit|miss|error|coalesced` | Cache lookup and in-flight coalescing behavior for article searches. |
+| `news_cache_errors_total` | `operation=get|set` | Cache backend errors that were tolerated by falling through to upstream or returning an uncached upstream response. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
 | `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload` | GNews provider request latency histogram. |
 
-Use cache hit rate to understand quota protection, and upstream latency/error metrics to separate provider trouble from local API trouble.
+Use cache hit rate and coalesced miss counts to understand quota protection, cache error metrics to detect Redis/backend trouble, and upstream latency/error metrics to separate provider trouble from local API trouble.
 
 ## Docker
 

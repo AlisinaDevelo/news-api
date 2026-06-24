@@ -63,6 +63,12 @@ export function getCacheStore(): CacheStore {
   return singleton;
 }
 
+/** @internal tests */
+export function setCacheStoreForTests(store: CacheStore): void {
+  singleton = store;
+  redisClient = null;
+}
+
 export async function disconnectCacheStore(): Promise<void> {
   if (redisClient) {
     try {

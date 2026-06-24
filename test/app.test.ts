@@ -19,10 +19,12 @@ vi.mock("axios", async (importOriginal) => {
 import axios from "axios";
 import app from "../src/app";
 import { sampleArticles } from "./fixtures/articles";
+import { resetCacheStoreForTests, setCacheStoreForTests } from "../src/cache/store";
 
 describe("app", () => {
   beforeEach(() => {
     mockGet.mockReset();
+    resetCacheStoreForTests();
   });
 
   it("GET /health returns ok", async () => {
@@ -149,6 +151,68 @@ describe("app", () => {
     expect(res.text).toContain(
       'news_upstream_request_duration_seconds_bucket{le="0.05",outcome="success"}'
     );
+  });
+
+  it("falls through to upstream when cache get fails", async () => {
+    setCacheStoreForTests({
+      async get() {
+        throw new Error("cache unavailable");
+      },
+      async set() {
+        return undefined;
+      },
+    });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    const q = `cache-get-fails-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(sampleArticles);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns upstream response when cache set fails", async () => {
+    setCacheStoreForTests({
+      async get() {
+        return undefined;
+      },
+      async set() {
+        throw new Error("cache write failed");
+      },
+    });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    const q = `cache-set-fails-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(sampleArticles);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces identical in-flight cache misses", async () => {
+    mockGet.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ data: { articles: sampleArticles } }), 20);
+        })
+    );
+    const q = `coalesced-${Math.random().toString(36).slice(2)}`;
+
+    const [first, second, third] = await Promise.all([
+      request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`),
+      request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`),
+      request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(third.status).toBe(200);
+    expect(first.body).toEqual(sampleArticles);
+    expect(second.body).toEqual(sampleArticles);
+    expect(third.body).toEqual(sampleArticles);
+    expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
   it("GET /api/articles/title returns article when matched", async () => {
