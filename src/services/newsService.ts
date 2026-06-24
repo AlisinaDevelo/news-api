@@ -2,7 +2,7 @@ import axios from "axios";
 import { Article } from "../types/article";
 import { HttpError } from "../errors/HttpError";
 import { getCacheStore } from "../cache/store";
-import { UPSTREAM_TIMEOUT_MS } from "../config/upstream";
+import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 import {
   cacheEventsTotal,
@@ -11,7 +11,6 @@ import {
 } from "../metrics/register";
 
 const API_KEY = process.env.GNEWS_API_KEY;
-const BASE_URL = "https://gnews.io/api/v4";
 
 function normalizeArticles(data: unknown): Article[] {
   if (
@@ -63,7 +62,7 @@ export const fetchArticles = async (options: ArticleSearchOptions): Promise<Arti
   const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
   let articles: Article[];
   try {
-    const response = await axios.get<{ articles: Article[] }>(`${BASE_URL}/search`, {
+    const response = await axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
       params: toProviderParams(options),
       timeout: UPSTREAM_TIMEOUT_MS,
       validateStatus: (s) => s >= 200 && s < 300,

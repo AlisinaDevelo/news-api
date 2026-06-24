@@ -1,6 +1,6 @@
 # news-api
 
-**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Searches support provider-backed filters for language, country, date range, and sort order. Identical normalized searches are cached (in-memory by default, or **Redis** when `REDIS_URL` is set) to protect quota and latency.
+**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Searches support provider-backed filters for language, country, date range, and sort order. Identical normalized searches are cached (in-memory by default, or **Redis** when `REDIS_URL` is set) to protect quota and latency. The upstream base URL is injectable for deterministic local integration tests and benchmarks.
 
 ## Production-oriented features
 

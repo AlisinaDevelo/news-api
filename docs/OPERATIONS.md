@@ -8,6 +8,7 @@
 | `PORT` | `3000` | HTTP listen port. |
 | `NODE_ENV` | — | Use `production` in deployed environments. |
 | `LOG_LEVEL` | `info` (non-test) | Pino level (`trace`–`fatal`, or `silent`). |
+| `GNEWS_BASE_URL` | `https://gnews.io/api/v4` | Upstream provider base URL. Override only for local integration tests, benchmarks, or compatible provider mocks. |
 | `HTTP_TIMEOUT_MS` | `15000` | Outbound GNews request timeout (max `60000`). |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
 | `RATE_LIMIT_MAX` | `120` | Max requests per IP per window. |
