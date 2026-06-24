@@ -84,6 +84,12 @@ CLIENT_API_KEY=client-secret-one npm run smoke
 
 The smoke test checks `/health`, `/ready`, `/openapi.yaml`, `/api/articles`, and `/metrics`.
 
+To smoke-test the production container without a live GNews key, boot the CI Compose stack against the fake provider:
+
+```bash
+npm run smoke:docker
+```
+
 ## Local Benchmark
 
 For reproducible cache/upstream performance checks without a live GNews key:

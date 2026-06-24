@@ -124,6 +124,7 @@ Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit hea
 | `npm run lint` | ESLint. |
 | `npm run contract` | Validate `docs/openapi.yaml` with Redocly CLI. |
 | `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, optional `CLIENT_API_KEY`). |
+| `npm run smoke:docker` | Compose smoke test: boot the image against a fake GNews provider and run `npm run smoke`. |
 | `npm run benchmark:local` | Builds the app, starts a fake GNews provider, and measures cold searches vs warm cache hits. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md). |
 
 ## Project layout

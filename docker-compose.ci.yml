@@ -1,0 +1,30 @@
+services:
+  fake-gnews:
+    image: node:22-alpine
+    working_dir: /app
+    command: ["node", "/app/scripts/fake-gnews-provider.mjs"]
+    environment:
+      PORT: "4010"
+      FAKE_GNEWS_DELAY_MS: "5"
+    volumes:
+      - ./scripts:/app/scripts:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  api:
+    build: .
+    depends_on:
+      fake-gnews:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      GNEWS_API_KEY: ci
+      GNEWS_BASE_URL: http://fake-gnews:4010
+      PORT: "3000"
+      NODE_ENV: production
+      DISABLE_RATE_LIMIT: "1"
+      LOG_LEVEL: silent

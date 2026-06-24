@@ -16,6 +16,7 @@
     "lint": "eslint src test vitest.config.ts",
     "contract": "redocly lint docs/openapi.yaml",
     "smoke": "sh scripts/smoke-test.sh",
+    "smoke:docker": "sh scripts/docker-compose-smoke.sh",
     "benchmark:local": "npm run build && node scripts/local-benchmark.mjs"
   },
   "keywords": [

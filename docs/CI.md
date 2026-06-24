@@ -17,19 +17,20 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 
 ### Container (`docker` job)
 
-9. **Buildx build** — [Dockerfile](../Dockerfile) with **`provenance: mode=max`** and **SBOM** (no registry push). Validates supply-chain metadata generation in CI.
+9. **`npm run smoke:docker`** — Compose boots the production image against a GNews-compatible fake provider, waits for readiness, then runs `npm run smoke` against the exposed API.
+10. **Buildx build** — [Dockerfile](../Dockerfile) with **`provenance: mode=max`** and **SBOM** (no registry push). Validates supply-chain metadata generation in CI.
 
 ### Pull requests only
 
-10. **[Dependency review](../.github/workflows/dependency-review.yml)** — flags vulnerable or blocked dependencies introduced by the PR.
+11. **[Dependency review](../.github/workflows/dependency-review.yml)** — flags vulnerable or blocked dependencies introduced by the PR.
 
 ### Every push / PR (supply chain)
 
-11. **[SBOM](../.github/workflows/supply-chain.yml)** — [Anchore SBOM Action](https://github.com/anchore/sbom-action) produces SPDX JSON and uploads it as a workflow artifact.
+12. **[SBOM](../.github/workflows/supply-chain.yml)** — [Anchore SBOM Action](https://github.com/anchore/sbom-action) produces SPDX JSON and uploads it as a workflow artifact.
 
 ### `main` branch pushes only
 
-12. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json` (best-effort; `continue-on-error` if attestations are unavailable on the plan).
+13. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json` (best-effort; `continue-on-error` if attestations are unavailable on the plan).
 
 ### Code scanning (`CodeQL` workflow)
 
@@ -53,6 +54,7 @@ npm run contract
 npm test
 npm run build
 docker build .
+npm run smoke:docker
 ```
 
 Optional (matches the CI Docker job more closely, requires Buildx):
