@@ -9,26 +9,27 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 1. **`npm ci`** — reproducible install from `package-lock.json`.
 2. **`npm audit --audit-level=high`** — fails the job if high or critical advisories remain.
 3. **`npm run lint`** — [ESLint](https://eslint.org/) on `src/`, `test/`, and `vitest.config.ts`.
-4. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions.
-5. **`npm run test:coverage`** — **Node 22 only**; uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
-6. **[Codecov](https://codecov.io)** — **Node 22 only**; uploads `coverage/lcov.info`. For private repos set repository secret `CODECOV_TOKEN`. `fail_ci_if_error` is off so missing token does not break the build.
-7. **`npm run build`** — TypeScript compile to `dist/`.
+4. **`npm run contract`** — [Redocly CLI](https://redocly.com/docs/cli) validates `docs/openapi.yaml` so the published API contract stays parseable and policy-compliant.
+5. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions.
+6. **`npm run test:coverage`** — **Node 22 only**; uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
+7. **[Codecov](https://codecov.io)** — **Node 22 only**; uploads `coverage/lcov.info`. For private repos set repository secret `CODECOV_TOKEN`. `fail_ci_if_error` is off so missing token does not break the build.
+8. **`npm run build`** — TypeScript compile to `dist/`.
 
 ### Container (`docker` job)
 
-8. **Buildx build** — [Dockerfile](../Dockerfile) with **`provenance: mode=max`** and **SBOM** (no registry push). Validates supply-chain metadata generation in CI.
+9. **Buildx build** — [Dockerfile](../Dockerfile) with **`provenance: mode=max`** and **SBOM** (no registry push). Validates supply-chain metadata generation in CI.
 
 ### Pull requests only
 
-9. **[Dependency review](../.github/workflows/dependency-review.yml)** — flags vulnerable or blocked dependencies introduced by the PR.
+10. **[Dependency review](../.github/workflows/dependency-review.yml)** — flags vulnerable or blocked dependencies introduced by the PR.
 
 ### Every push / PR (supply chain)
 
-10. **[SBOM](../.github/workflows/supply-chain.yml)** — [Anchore SBOM Action](https://github.com/anchore/sbom-action) produces SPDX JSON and uploads it as a workflow artifact.
+11. **[SBOM](../.github/workflows/supply-chain.yml)** — [Anchore SBOM Action](https://github.com/anchore/sbom-action) produces SPDX JSON and uploads it as a workflow artifact.
 
 ### `main` branch pushes only
 
-11. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json` (best-effort; `continue-on-error` if attestations are unavailable on the plan).
+12. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json` (best-effort; `continue-on-error` if attestations are unavailable on the plan).
 
 ### Code scanning (`CodeQL` workflow)
 
@@ -48,6 +49,7 @@ When you push an annotated tag matching `v*.*.*`, [release.yml](../.github/workf
 npm ci
 npm audit --audit-level=high
 npm run lint
+npm run contract
 npm test
 npm run build
 docker build .

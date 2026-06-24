@@ -5,6 +5,9 @@ info:
     REST API backed by the GNews search endpoint.
     When `CLIENT_API_KEYS` is set on the server, send a matching `X-API-Key` header on `/api/*` requests.
   version: 1.2.0
+  license:
+    name: MIT
+    url: https://opensource.org/license/mit
 servers:
   - url: http://localhost:3000
     description: Local development
@@ -14,6 +17,7 @@ paths:
     get:
       summary: Liveness probe
       operationId: getHealth
+      security: []
       responses:
         "200":
           description: Process is running
@@ -27,6 +31,7 @@ paths:
       summary: Readiness probe
       description: Returns 503 when `GNEWS_API_KEY` is not configured (non-test environments).
       operationId: getReady
+      security: []
       responses:
         "200":
           description: Ready to serve traffic
@@ -45,6 +50,7 @@ paths:
     get:
       summary: Prometheus metrics
       operationId: getMetrics
+      security: []
       responses:
         "200":
           description: Prometheus text / OpenMetrics exposition format
@@ -53,10 +59,26 @@ paths:
               schema:
                 type: string
 
+  /openapi.yaml:
+    get:
+      summary: OpenAPI contract
+      operationId: getOpenApiYaml
+      security: []
+      responses:
+        "200":
+          description: OpenAPI 3 document
+          content:
+            application/yaml:
+              schema:
+                type: string
+
   /api/articles:
     get:
       summary: Search articles
       operationId: searchArticles
+      security:
+        - ApiKeyAuth: []
+        - {}
       parameters:
         - name: X-API-Key
           in: header
@@ -136,6 +158,9 @@ paths:
     get:
       summary: Find article by exact title
       operationId: getArticleByTitle
+      security:
+        - ApiKeyAuth: []
+        - {}
       parameters:
         - name: X-API-Key
           in: header
@@ -174,6 +199,9 @@ paths:
     get:
       summary: Filter articles by news source name
       operationId: listArticlesBySource
+      security:
+        - ApiKeyAuth: []
+        - {}
       parameters:
         - name: X-API-Key
           in: header
@@ -250,6 +278,13 @@ paths:
           $ref: "#/components/responses/InternalError"
 
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Required for `/api/*` requests only when the server sets `CLIENT_API_KEYS`.
+
   responses:
     Unauthorized:
       description: Missing or invalid X-API-Key when CLIENT_API_KEYS is configured

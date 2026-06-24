@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deterministic `npm run benchmark:local` benchmark for cold upstream-backed searches and warm cache hits.
 - Cache resilience for article searches: cache read/write failures are logged and metriced without failing requests.
 - In-flight coalescing for identical cache misses so concurrent same-key searches share one upstream request per process.
+- Redocly-powered `npm run contract` check for the OpenAPI document, wired into CI.
 
 ### Security
 

@@ -34,6 +34,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: OpenAPI contract
+        run: npm run contract
+
       - name: Test
         run: npm test
 
