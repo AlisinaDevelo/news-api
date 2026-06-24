@@ -90,6 +90,8 @@ To smoke-test the production container without a live GNews key, boot the CI Com
 npm run smoke:docker
 ```
 
+For hosted Docker deployment notes and safe public-demo defaults, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Local Benchmark
 
 For reproducible cache/upstream performance checks without a live GNews key:

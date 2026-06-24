@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In-flight coalescing for identical cache misses so concurrent same-key searches share one upstream request per process.
 - Redocly-powered `npm run contract` check for the OpenAPI document, wired into CI.
 - Docker Compose smoke test against a fake GNews provider, wired into CI.
+- Deployment guide for safe public demos on Render, Fly.io, and Railway.
+- Docker healthcheck now honors the runtime `PORT` environment variable.
 
 ### Security
 
