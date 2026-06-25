@@ -18,6 +18,56 @@ flowchart LR
 4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and otherwise calls GNews `/api/v4/search` via `axios`. Cache backend errors are logged and metriced without failing the article request.
 5. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
 
+### A search, end to end
+
+The cache is an optimization, not a dependency: hits skip the provider, misses are
+coalesced per process, and cache failures fall through to the upstream rather than failing
+the request.
+
+```mermaid
+sequenceDiagram
+  actor Client
+  participant API as Express + controller
+  participant Svc as newsService
+  participant Cache as cache (memory / Redis)
+  participant GNews
+
+  Client->>API: GET /api/articles?query=...
+  API->>API: validate params (400 on bad input)
+  API->>Svc: search(normalized key)
+  Svc->>Cache: get(key)
+  alt cache hit
+    Cache-->>Svc: articles
+  else miss (read fail falls through here too)
+    Svc->>Svc: coalesce identical in-flight misses
+    Svc->>GNews: GET /api/v4/search (timeout)
+    GNews-->>Svc: articles  (502 on provider/transport error)
+    Svc->>Cache: set(key, articles, TTL 600s)
+  end
+  Svc-->>API: articles
+  API-->>Client: 200 + results (or { error })
+```
+
+### Deployment shape
+
+```mermaid
+flowchart LR
+  client["clients"] --> lb["load balancer / Ingress"]
+  lb --> a1["news-api pod"]
+  lb --> a2["news-api pod"]
+  a1 --> redis[("Redis<br/>shared cache")]
+  a2 --> redis
+  a1 --> gnews["GNews API"]
+  a2 --> gnews
+  a1 -. /metrics .-> prom["Prometheus"]
+  a2 -. /metrics .-> prom
+  a1 -. OTLP .-> otel["OpenTelemetry collector"]
+```
+
+Liveness `/health` and readiness `/ready` back the probes in the example
+[Kubernetes manifests](../deploy/k8s/); `REDIS_URL` switches the cache from per-pod memory
+to the shared store drawn above.
+
 ## Configuration
 
 - `dotenv` loads `.env` when `src/server.ts` starts (not required for Vitest, which sets `NODE_ENV=test` and mocks HTTP).
