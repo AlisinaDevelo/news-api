@@ -148,7 +148,7 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` errors: `{ "error
 - `src/metrics/register.ts` — Prometheus registry: HTTP, cache, and upstream provider metrics.
 - `src/providers/gnewsProvider.ts` — GNews adapter: provider params, payload validation, timeouts, upstream instrumentation.
 - `src/services/newsService.ts` — Article search orchestration: normalized cache keys, cache resilience/coalescing, title/source narrowing.
-- `test/` — Vitest; HTTP tests mock `axios` (no live GNews in CI).
+- `test/` — Vitest; HTTP tests mock `axios` (no live GNews in CI), including OpenAPI-backed response contract checks.
 
 Architecture diagram: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
 

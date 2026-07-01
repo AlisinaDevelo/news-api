@@ -10,7 +10,7 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 2. **`npm audit --audit-level=high`** — fails the job if high or critical advisories remain.
 3. **`npm run lint`** — [ESLint](https://eslint.org/) on `src/`, `test/`, and `vitest.config.ts`.
 4. **`npm run contract`** — [Redocly CLI](https://redocly.com/docs/cli) validates `docs/openapi.yaml` so the published API contract stays parseable and policy-compliant.
-5. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions.
+5. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions. Response contract tests compile selected `docs/openapi.yaml` schemas and validate real HTTP responses.
 6. **`npm run test:coverage`** — **Node 22 only**; uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
 7. **[Codecov](https://codecov.io)** — **Node 22 only**; uploads `coverage/lcov.info`. For private repos set repository secret `CODECOV_TOKEN`. `fail_ci_if_error` is off so missing token does not break the build.
 8. **`npm run build`** — TypeScript compile to `dist/`.
