@@ -15,6 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src test vitest.config.ts",
     "contract": "redocly lint docs/openapi.yaml",
+    "client:generate": "node scripts/generate-client-types.mjs",
+    "client:check": "npm run client:generate && git diff --exit-code -- src/client/openapi-types.ts",
     "smoke": "sh scripts/smoke-test.sh",
     "smoke:docker": "sh scripts/docker-compose-smoke.sh",
     "benchmark:local": "npm run build && node scripts/local-benchmark.mjs"
@@ -56,6 +58,7 @@
     "ajv-formats": "^3.0.1",
     "eslint": "^9.39.4",
     "nodemon": "^3.1.4",
+    "openapi-typescript": "^7.13.0",
     "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",

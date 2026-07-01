@@ -42,7 +42,9 @@ interface OpenApiDocument {
       };
     }
   >;
-  components: Record<string, unknown>;
+  components: {
+    schemas: Record<string, Record<string, unknown>>;
+  } & Record<string, unknown>;
 }
 
 const openapi = parse(
@@ -51,6 +53,9 @@ const openapi = parse(
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
+for (const [name, schema] of Object.entries(openapi.components.schemas)) {
+  ajv.addSchema(schema, `#/components/schemas/${name}`);
+}
 
 function resolveComponentRef<T>(ref: string): T {
   const parts = ref.replace(/^#\//, "").split("/");
@@ -77,10 +82,7 @@ function responseValidator(route: string, status: number): ValidateFunction {
     throw new Error(`missing JSON response schema for GET ${route} ${status}`);
   }
 
-  return ajv.compile({
-    ...schema,
-    components: openapi.components,
-  });
+  return ajv.compile(schema);
 }
 
 function expectValidResponse(validate: ValidateFunction, body: unknown): void {

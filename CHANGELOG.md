@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Versioned `/api/v1/*` endpoints with `{ data, meta }` response envelopes, cache metadata, and structured error bodies.
 - OpenAPI-backed response contract tests for the v1 success and structured error envelopes.
 - Provider circuit breaker for repeated GNews failures, including Prometheus circuit event metrics and `503` short-circuit responses.
+- OpenAPI-generated TypeScript client types, a small v1 `NewsApiClient` wrapper, and CI drift checks for generated client output.
 
 ### Changed
 

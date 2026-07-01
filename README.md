@@ -25,7 +25,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 - **Container:** multi-stage [Dockerfile](Dockerfile) (non-root user, healthcheck).
 - **Deploy:** Example [Kubernetes manifests](deploy/k8s/).
 
-**Automation:** [CI](.github/workflows/ci.yml) (Node **20**/**22**), [CodeQL](.github/workflows/codeql.yml), [Codecov](https://codecov.io) upload, [dependency review](.github/workflows/dependency-review.yml), [SBOM](.github/workflows/supply-chain.yml), [provenance attest](.github/workflows/provenance.yml), [releases on tags](.github/workflows/release.yml), and [Dependabot](.github/dependabot.yml) (npm, Docker, Actions). Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). Security: [SECURITY.md](SECURITY.md).
+**Automation:** [CI](.github/workflows/ci.yml) (Node **20**/**22**), [CodeQL](.github/workflows/codeql.yml), [Codecov](https://codecov.io) upload, [dependency review](.github/workflows/dependency-review.yml), [SBOM](.github/workflows/supply-chain.yml), [provenance attest](.github/workflows/provenance.yml), [releases on tags](.github/workflows/release.yml), and [Dependabot](.github/dependabot.yml) (npm, Docker, Actions). Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). TypeScript client: [docs/CLIENT.md](docs/CLIENT.md). Security: [SECURITY.md](SECURITY.md).
 
 Deployment guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) covers safe public-demo settings and Render/Fly/Railway Docker paths.
 
@@ -132,6 +132,8 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` errors: `{ "error
 | `npm run test:coverage` | Tests + coverage. |
 | `npm run lint` | ESLint. |
 | `npm run contract` | Validate `docs/openapi.yaml` with Redocly CLI. |
+| `npm run client:generate` | Generate TypeScript client types from `docs/openapi.yaml`. |
+| `npm run client:check` | Regenerate client types and fail if checked-in output is stale. |
 | `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, optional `CLIENT_API_KEY`). |
 | `npm run smoke:docker` | Compose smoke test: boot the image against a fake GNews provider and run `npm run smoke`. |
 | `npm run benchmark:local` | Builds the app, starts a fake GNews provider, and measures cold searches vs warm cache hits. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md). |
@@ -144,6 +146,7 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` errors: `{ "error
 - `src/logger.ts` — Pino + request logging.
 - `src/middleware/` — Security headers, rate limit, trust proxy, metrics observer, optional client API key, errors.
 - `src/http/responses.ts` — Versioned response envelope helpers.
+- `src/client/` — OpenAPI-generated TypeScript types and small v1 client wrapper.
 - `src/cache/store.ts` — Pluggable cache: memory or Redis.
 - `src/metrics/register.ts` — Prometheus registry: HTTP, cache, and upstream provider metrics.
 - `src/providers/gnewsProvider.ts` — GNews adapter: provider params, payload validation, timeouts, upstream instrumentation.
