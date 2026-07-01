@@ -72,6 +72,148 @@ paths:
               schema:
                 type: string
 
+  /api/v1/articles:
+    get:
+      summary: Search articles with response metadata
+      operationId: searchArticlesV1
+      security:
+        - ApiKeyAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/ClientApiKey"
+        - $ref: "#/components/parameters/Query"
+        - $ref: "#/components/parameters/Count"
+        - $ref: "#/components/parameters/Lang"
+        - $ref: "#/components/parameters/Country"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - $ref: "#/components/parameters/SortBy"
+      responses:
+        "200":
+          description: Enveloped article list from provider (possibly cached)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleSearchEnvelope"
+        "400":
+          $ref: "#/components/responses/V1BadRequest"
+        "401":
+          $ref: "#/components/responses/V1Unauthorized"
+        "429":
+          description: Rate limit exceeded
+        "502":
+          $ref: "#/components/responses/V1BadGateway"
+        "500":
+          $ref: "#/components/responses/V1InternalError"
+
+  /api/v1/articles/search:
+    get:
+      summary: Alias for v1 article search
+      operationId: searchArticlesV1Alias
+      security:
+        - ApiKeyAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/ClientApiKey"
+        - $ref: "#/components/parameters/Query"
+        - $ref: "#/components/parameters/Count"
+        - $ref: "#/components/parameters/Lang"
+        - $ref: "#/components/parameters/Country"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - $ref: "#/components/parameters/SortBy"
+      responses:
+        "200":
+          description: Enveloped article list from provider (possibly cached)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleSearchEnvelope"
+        "400":
+          $ref: "#/components/responses/V1BadRequest"
+        "401":
+          $ref: "#/components/responses/V1Unauthorized"
+        "429":
+          description: Rate limit exceeded
+        "502":
+          $ref: "#/components/responses/V1BadGateway"
+        "500":
+          $ref: "#/components/responses/V1InternalError"
+
+  /api/v1/articles/title/{title}:
+    get:
+      summary: Find article by exact title with response metadata
+      operationId: getArticleByTitleV1
+      security:
+        - ApiKeyAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/ClientApiKey"
+        - name: title
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Enveloped matching article
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArticleEnvelope"
+        "401":
+          $ref: "#/components/responses/V1Unauthorized"
+        "404":
+          description: No article with that title in the search window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Rate limit exceeded
+        "502":
+          $ref: "#/components/responses/V1BadGateway"
+        "500":
+          $ref: "#/components/responses/V1InternalError"
+
+  /api/v1/sources/{source}/articles:
+    get:
+      summary: Filter articles by news source name with response metadata
+      operationId: listArticlesBySourceV1
+      security:
+        - ApiKeyAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/ClientApiKey"
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Count"
+        - $ref: "#/components/parameters/Lang"
+        - $ref: "#/components/parameters/Country"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - $ref: "#/components/parameters/SortBy"
+      responses:
+        "200":
+          description: Enveloped articles whose source name matches (case-insensitive)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceArticlesEnvelope"
+        "400":
+          $ref: "#/components/responses/V1BadRequest"
+        "401":
+          $ref: "#/components/responses/V1Unauthorized"
+        "429":
+          description: Rate limit exceeded
+        "502":
+          $ref: "#/components/responses/V1BadGateway"
+        "500":
+          $ref: "#/components/responses/V1InternalError"
+
   /api/articles:
     get:
       summary: Search articles
@@ -285,6 +427,70 @@ components:
       name: X-API-Key
       description: Required for `/api/*` requests only when the server sets `CLIENT_API_KEYS`.
 
+  parameters:
+    ClientApiKey:
+      name: X-API-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Required when the server sets CLIENT_API_KEYS.
+    Query:
+      name: query
+      in: query
+      required: true
+      schema:
+        type: string
+    Count:
+      name: count
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+    Lang:
+      name: lang
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: "^[a-zA-Z]{2}$"
+      description: Two-letter article language code.
+    Country:
+      name: country
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: "^[a-zA-Z]{2}$"
+      description: Two-letter source country code.
+    From:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      description: Include articles published at or after this ISO 8601 timestamp.
+    To:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      description: Include articles published at or before this ISO 8601 timestamp.
+    SortBy:
+      name: sortBy
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [publishedAt, relevance]
+      description: Provider sort order. Forwarded to GNews as `sortby`.
+
   responses:
     Unauthorized:
       description: Missing or invalid X-API-Key when CLIENT_API_KEYS is configured
@@ -310,6 +516,30 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorBody"
+    V1Unauthorized:
+      description: Missing or invalid X-API-Key when CLIENT_API_KEYS is configured
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    V1BadRequest:
+      description: Invalid or missing parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    V1BadGateway:
+      description: Upstream provider error or invalid provider payload
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    V1InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
 
   schemas:
     ErrorBody:
@@ -318,6 +548,23 @@ components:
       properties:
         error:
           type: string
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+              example: missing_query_parameter
+            message:
+              type: string
+              example: "Missing or empty query parameter: query"
+            requestId:
+              type: string
 
     HealthResponse:
       type: object
@@ -380,3 +627,68 @@ components:
           format: date-time
         source:
           $ref: "#/components/schemas/ArticleSource"
+
+    ArticleSearchMeta:
+      type: object
+      required: [query, count, filters, cache, requestId]
+      properties:
+        query:
+          type: string
+        count:
+          type: integer
+        filters:
+          type: object
+          additionalProperties: true
+        cache:
+          type: string
+          enum: [hit, miss, coalesced]
+        requestId:
+          type: string
+
+    ArticleSearchEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Article"
+        meta:
+          $ref: "#/components/schemas/ArticleSearchMeta"
+
+    ArticleEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          $ref: "#/components/schemas/Article"
+        meta:
+          type: object
+          required: [requestId]
+          properties:
+            title:
+              type: string
+            requestId:
+              type: string
+
+    SourceArticlesEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Article"
+        meta:
+          type: object
+          required: [source, count, filters, requestId]
+          properties:
+            source:
+              type: string
+            count:
+              type: integer
+            filters:
+              type: object
+              additionalProperties: true
+            requestId:
+              type: string

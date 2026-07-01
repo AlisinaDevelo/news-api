@@ -10,7 +10,7 @@ export function parseArticleCount(raw: unknown): number {
   }
   const n = parseInt(String(raw), 10);
   if (!Number.isFinite(n) || n < 1) {
-    throw new HttpError(400, "count must be a positive integer");
+    throw new HttpError(400, "count must be a positive integer", "invalid_count");
   }
   return Math.min(n, MAX_ARTICLE_COUNT);
 }
@@ -18,7 +18,11 @@ export function parseArticleCount(raw: unknown): number {
 export function requireQueryString(value: unknown, fieldName: string): string {
   const s = typeof value === "string" ? value.trim() : "";
   if (!s) {
-    throw new HttpError(400, `Missing or empty query parameter: ${fieldName}`);
+    throw new HttpError(
+      400,
+      `Missing or empty query parameter: ${fieldName}`,
+      "missing_query_parameter"
+    );
   }
   return s;
 }
@@ -28,7 +32,7 @@ function optionalString(value: unknown, fieldName: string): string | undefined {
     return undefined;
   }
   if (typeof value !== "string") {
-    throw new HttpError(400, `${fieldName} must be a string`);
+    throw new HttpError(400, `${fieldName} must be a string`, "invalid_query_parameter");
   }
   const s = value.trim();
   if (!s) {
@@ -43,7 +47,7 @@ function parseTwoLetterCode(value: unknown, fieldName: "lang" | "country"): stri
     return undefined;
   }
   if (!/^[a-z]{2}$/i.test(s)) {
-    throw new HttpError(400, `${fieldName} must be a two-letter code`);
+    throw new HttpError(400, `${fieldName} must be a two-letter code`, `invalid_${fieldName}`);
   }
   return s.toLowerCase();
 }
@@ -55,7 +59,7 @@ function parseIsoDate(value: unknown, fieldName: "from" | "to"): string | undefi
   }
   const timestamp = Date.parse(s);
   if (!Number.isFinite(timestamp)) {
-    throw new HttpError(400, `${fieldName} must be an ISO 8601 date`);
+    throw new HttpError(400, `${fieldName} must be an ISO 8601 date`, `invalid_${fieldName}`);
   }
   return new Date(timestamp).toISOString();
 }
@@ -66,7 +70,7 @@ function parseSortBy(value: unknown): ArticleSortBy | undefined {
     return undefined;
   }
   if (!SORT_VALUES.has(s as ArticleSortBy)) {
-    throw new HttpError(400, "sortBy must be one of: publishedAt, relevance");
+    throw new HttpError(400, "sortBy must be one of: publishedAt, relevance", "invalid_sort_by");
   }
   return s as ArticleSortBy;
 }
@@ -76,7 +80,7 @@ export function parseArticleSearchFilters(query: Record<string, unknown>): Artic
   const to = parseIsoDate(query.to, "to");
 
   if (from && to && Date.parse(from) > Date.parse(to)) {
-    throw new HttpError(400, "from must be before or equal to to");
+    throw new HttpError(400, "from must be before or equal to to", "invalid_date_range");
   }
 
   const sortBy = parseSortBy(query.sortBy ?? query.sortby);

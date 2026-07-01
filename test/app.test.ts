@@ -85,6 +85,44 @@ describe("app", () => {
     );
   });
 
+  it("GET /api/v1/articles returns an enveloped search response", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const res = await request(app).get("/api/v1/articles?query=tech&count=2&lang=EN");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      data: sampleArticles,
+      meta: {
+        query: "tech",
+        count: 2,
+        filters: { lang: "en" },
+        cache: "miss",
+      },
+    });
+    expect(typeof res.body.meta.requestId).toBe("string");
+  });
+
+  it("GET /api/v1/articles exposes cache hits in response metadata", async () => {
+    mockGet.mockResolvedValue({ data: { articles: sampleArticles } });
+    const q = `v1-cached-${Math.random().toString(36).slice(2)}`;
+
+    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=2`);
+    const res = await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.meta.cache).toBe("hit");
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET /api/v1/articles/search aliases the v1 search endpoint", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const res = await request(app).get("/api/v1/articles/search?query=tech&count=2");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(sampleArticles);
+    expect(res.body.meta.query).toBe("tech");
+  });
+
   it("GET /api/articles forwards validated search filters", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const res = await request(app).get(
@@ -223,6 +261,17 @@ describe("app", () => {
     expect(res.body.title).toBe("Alpha headline");
   });
 
+  it("GET /api/v1/articles/title returns enveloped article when matched", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const title = encodeURIComponent("Alpha headline");
+    const res = await request(app).get(`/api/v1/articles/title/${title}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.title).toBe("Alpha headline");
+    expect(res.body.meta).toMatchObject({ title: "Alpha headline" });
+    expect(typeof res.body.meta.requestId).toBe("string");
+  });
+
   it("GET /api/articles/title returns 404 when missing", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const title = encodeURIComponent("Missing");
@@ -244,6 +293,16 @@ describe("app", () => {
     expect(res.body[0].source.name).toBe("BBC");
   });
 
+  it("GET /api/v1/sources/:source/articles filters by source name with envelope", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const res = await request(app).get("/api/v1/sources/BBC/articles?count=10");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].source.name).toBe("BBC");
+    expect(res.body.meta).toMatchObject({ source: "BBC", count: 10 });
+  });
+
   it("returns 500 when upstream request fails", async () => {
     mockGet.mockRejectedValueOnce(new Error("network"));
     const res = await request(app).get("/api/articles?query=fail&count=1");
@@ -263,6 +322,19 @@ describe("app", () => {
     const res = await request(app).get("/api/articles?query=badpayload&count=1");
     expect(res.status).toBe(502);
     expect(res.body.error).toBe("Invalid response from news provider");
+  });
+
+  it("GET /api/v1/articles returns structured errors", async () => {
+    const res = await request(app).get("/api/v1/articles");
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      error: {
+        code: "missing_query_parameter",
+        message: "Missing or empty query parameter: query",
+      },
+    });
+    expect(typeof res.body.error.requestId).toBe("string");
   });
 });
 

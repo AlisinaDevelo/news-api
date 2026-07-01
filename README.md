@@ -10,7 +10,7 @@ A search runs through a small, explicit pipeline — each stage is a separate, t
 2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set). Cache failures are logged/metriced but do not fail article requests; identical in-flight misses in the same process share one upstream call.
 3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502` rather than a hung request.
 4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss, upstream outcome, latency histogram), and optional OpenTelemetry spans.
-5. **Respond** — results are returned (or narrowed in memory for the title/source endpoints), with consistent `{ "error": "..." }` failures and standard rate-limit headers.
+5. **Respond** — legacy endpoints return raw article arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with request/cache metadata and structured error bodies.
 
 Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -95,6 +95,10 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` missing (non-test). |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
 | `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, cache hit/miss/error/coalescing counts, and upstream latency. |
+| `GET` | `/api/v1/articles` | Versioned search. Returns `{ data, meta }`, including normalized filters, cache status, and `requestId`. |
+| `GET` | `/api/v1/articles/search` | Alias for versioned search. |
+| `GET` | `/api/v1/articles/title/:title` | Exact title match with `{ data, meta }`, else structured `404`. |
+| `GET` | `/api/v1/sources/:source/articles` | Source-name filter with `{ data, meta }`. |
 | `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100), plus optional `lang`, `country`, `from`, `to`, `sortBy`. Optional header `X-API-Key` if `CLIENT_API_KEYS` is set. |
 | `GET` | `/api/articles/title/:title` | Exact title match in the current search window, else `404`. |
 | `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` optional, plus optional `lang`, `country`, `from`, `to`, `sortBy`. |
@@ -102,6 +106,9 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 **Examples**
 
 ```http
+GET /api/v1/articles?query=technology&count=5
+GET /api/v1/articles/search?query=postgres&lang=en&country=us&sortBy=relevance
+GET /api/v1/sources/BBC/articles?count=10
 GET /api/articles?query=technology&count=5
 GET /api/articles?query=postgres&lang=en&country=us&sortBy=relevance
 GET /api/articles?query=aws&from=2026-01-01T00:00:00Z&to=2026-01-31T23:59:59Z
@@ -111,7 +118,7 @@ GET /api/articles/source?source=BBC&count=10
 
 Search filters are validated before the upstream request. `lang` and `country` are two-letter codes, `from` and `to` must parse as ISO 8601 dates, and `sortBy` accepts `publishedAt` or `relevance`.
 
-Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit headers.
+Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Rate limit: `429` with standard rate-limit headers.
 
 ## Scripts
 
@@ -136,6 +143,7 @@ Errors: `{ "error": "message" }`. Rate limit: `429` with standard rate-limit hea
 - `src/tracing.ts` / `src/otel-bootstrap.ts` — Optional OpenTelemetry (before Express loads).
 - `src/logger.ts` — Pino + request logging.
 - `src/middleware/` — Security headers, rate limit, trust proxy, metrics observer, optional client API key, errors.
+- `src/http/responses.ts` — Versioned response envelope helpers.
 - `src/cache/store.ts` — Pluggable cache: memory or Redis.
 - `src/metrics/register.ts` — Prometheus registry: HTTP, cache, and upstream provider metrics.
 - `src/services/newsService.ts` — GNews client, normalized cache keys, cache resilience/coalescing, timeouts, upstream instrumentation.

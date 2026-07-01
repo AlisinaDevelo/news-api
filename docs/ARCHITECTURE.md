@@ -16,7 +16,8 @@ flowchart LR
 2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`), then mounts `/api` routes.
 3. **Controllers** validate query parameters and map domain results to HTTP status codes.
 4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and otherwise calls GNews `/api/v4/search` via `axios`. Cache backend errors are logged and metriced without failing the article request.
-5. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
+5. **Response mapping** keeps legacy `/api/articles*` endpoints backward compatible with raw arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with `requestId`, normalized filters, and cache status.
+6. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
 
 ### A search, end to end
 
@@ -45,7 +46,7 @@ sequenceDiagram
     Svc->>Cache: set(key, articles, TTL 600s)
   end
   Svc-->>API: articles
-  API-->>Client: 200 + results (or { error })
+  API-->>Client: 200 + results (legacy) or { data, meta } (v1)
 ```
 
 ### Deployment shape
@@ -75,7 +76,7 @@ to the shared store drawn above.
 
 ## Errors
 
-Unhandled promise rejections in async route handlers are forwarded by `asyncHandler` to Express. `HttpError` instances become JSON `{ "error": "..." }` with the right status; other errors become `500` without leaking internals.
+Unhandled promise rejections in async route handlers are forwarded by `asyncHandler` to Express. Legacy endpoints keep the original JSON `{ "error": "..." }` shape for compatibility. Versioned `/api/v1/*` endpoints return structured errors with stable machine-readable codes: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`.
 
 ## Caching
 

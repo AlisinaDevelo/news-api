@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker Compose smoke test against a fake GNews provider, wired into CI.
 - Deployment guide for safe public demos on Render, Fly.io, and Railway.
 - Docker healthcheck now honors the runtime `PORT` environment variable.
+- Versioned `/api/v1/*` endpoints with `{ data, meta }` response envelopes, cache metadata, and structured error bodies.
 
 ### Security
 

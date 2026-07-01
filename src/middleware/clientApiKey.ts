@@ -20,7 +20,7 @@ export function clientApiKeyGate(req: Request, _res: Response, next: NextFunctio
   }
   const provided = req.headers["x-api-key"];
   if (typeof provided !== "string" || !keys.includes(provided)) {
-    next(new HttpError(401, "Invalid or missing API key"));
+    next(new HttpError(401, "Invalid or missing API key", "invalid_api_key"));
     return;
   }
   next();

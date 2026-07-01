@@ -13,7 +13,14 @@ import {
 import { logger } from "../logger";
 
 const API_KEY = process.env.GNEWS_API_KEY;
-const inFlightSearches = new Map<string, Promise<Article[]>>();
+const inFlightSearches = new Map<string, Promise<ArticleSearchResult>>();
+
+export type ArticleSearchCacheStatus = "hit" | "miss" | "coalesced";
+
+export interface ArticleSearchResult {
+  articles: Article[];
+  cache: ArticleSearchCacheStatus;
+}
 
 function normalizeArticles(data: unknown): Article[] {
   if (
@@ -22,7 +29,7 @@ function normalizeArticles(data: unknown): Article[] {
     !("articles" in data) ||
     !Array.isArray((data as { articles: unknown }).articles)
   ) {
-    throw new HttpError(502, "Invalid response from news provider");
+    throw new HttpError(502, "Invalid response from news provider", "invalid_provider_payload");
   }
   return (data as { articles: Article[] }).articles;
 }
@@ -55,12 +62,12 @@ function toProviderParams(options: ArticleSearchOptions): Record<string, string 
 async function readCachedArticles(
   store: CacheStore,
   cacheKey: string
-): Promise<Article[] | undefined> {
+): Promise<ArticleSearchResult | undefined> {
   try {
     const cached = await store.get(cacheKey);
     if (cached !== undefined) {
       cacheEventsTotal.inc({ result: "hit" });
-      return cached as Article[];
+      return { articles: cached as Article[], cache: "hit" };
     }
   } catch (err) {
     cacheEventsTotal.inc({ result: "error" });
@@ -90,7 +97,7 @@ async function fetchArticlesFromUpstream(
   options: ArticleSearchOptions,
   store: CacheStore,
   cacheKey: string
-): Promise<Article[]> {
+): Promise<ArticleSearchResult> {
   const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
   let articles: Article[];
   try {
@@ -109,27 +116,30 @@ async function fetchArticlesFromUpstream(
     upstreamRequestsTotal.inc({ outcome });
     stopUpstreamTimer({ outcome });
     if (axios.isAxiosError(err)) {
-      throw new HttpError(502, "Upstream news service unavailable");
+      throw new HttpError(502, "Upstream news service unavailable", "upstream_unavailable");
     }
     throw err;
   }
 
   await writeCachedArticles(store, cacheKey, articles);
-  return articles;
+  return { articles, cache: "miss" };
 }
 
-export const fetchArticles = async (options: ArticleSearchOptions): Promise<Article[]> => {
+export const searchArticles = async (
+  options: ArticleSearchOptions
+): Promise<ArticleSearchResult> => {
   const cacheKey = searchCacheKey(options);
   const store = getCacheStore();
   const cached = await readCachedArticles(store, cacheKey);
-  if (cached !== undefined) {
+  if (cached) {
     return cached;
   }
 
   const existing = inFlightSearches.get(cacheKey);
   if (existing) {
     cacheEventsTotal.inc({ result: "coalesced" });
-    return existing;
+    const result = await existing;
+    return { ...result, cache: "coalesced" };
   }
 
   const search = fetchArticlesFromUpstream(options, store, cacheKey);
@@ -139,6 +149,11 @@ export const fetchArticles = async (options: ArticleSearchOptions): Promise<Arti
   } finally {
     inFlightSearches.delete(cacheKey);
   }
+};
+
+export const fetchArticles = async (options: ArticleSearchOptions): Promise<Article[]> => {
+  const result = await searchArticles(options);
+  return result.articles;
 };
 
 export const fetchArticlesByTitle = async (title: string): Promise<Article | undefined> => {
