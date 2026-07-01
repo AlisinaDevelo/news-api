@@ -13,6 +13,19 @@ servers:
     description: Local development
 
 paths:
+  /:
+    get:
+      summary: Service capability document
+      operationId: getRoot
+      security: []
+      responses:
+        "200":
+          description: Links to API versions, docs, and observability endpoints
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RootCapabilities"
+
   /health:
     get:
       summary: Liveness probe
@@ -585,6 +598,37 @@ components:
               example: "Missing or empty query parameter: query"
             requestId:
               type: string
+
+    RootCapabilities:
+      type: object
+      required: [name, api, docs, observability]
+      properties:
+        name:
+          type: string
+          example: news-api
+        api:
+          type: object
+          required: [current, v1, legacy]
+          properties:
+            current:
+              type: string
+              example: v1
+            v1:
+              type: object
+              additionalProperties:
+                type: string
+            legacy:
+              type: object
+              additionalProperties:
+                type: string
+        docs:
+          type: object
+          additionalProperties:
+            type: string
+        observability:
+          type: object
+          additionalProperties:
+            type: string
 
     HealthResponse:
       type: object

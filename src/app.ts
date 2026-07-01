@@ -65,11 +65,31 @@ app.get("/metrics", async (_req, res, next) => {
 app.get("/", (_req, res) => {
   res.json({
     name: "news-api",
-    readme: "README.md",
-    openapi: "/openapi.yaml",
-    metrics: "/metrics",
-    health: "/health",
-    ready: "/ready",
+    api: {
+      current: "v1",
+      v1: {
+        articles: "/api/v1/articles",
+        articleSearch: "/api/v1/articles/search",
+        articleByTitle: "/api/v1/articles/title/{title}",
+        sourceArticles: "/api/v1/sources/{source}/articles",
+      },
+      legacy: {
+        articles: "/api/articles",
+        articleByTitle: "/api/articles/title/{title}",
+        sourceArticles: "/api/articles/source?source={source}",
+      },
+    },
+    docs: {
+      readme: "README.md",
+      openapi: "/openapi.yaml",
+      client: "docs/CLIENT.md",
+      operations: "docs/OPERATIONS.md",
+    },
+    observability: {
+      metrics: "/metrics",
+      health: "/health",
+      ready: "/ready",
+    },
   });
 });
 

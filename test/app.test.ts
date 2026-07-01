@@ -52,7 +52,28 @@ describe("app", () => {
   it("GET / returns service metadata", async () => {
     const res = await request(app).get("/");
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ name: "news-api" });
+    expect(res.body).toMatchObject({
+      name: "news-api",
+      api: {
+        current: "v1",
+        v1: {
+          articles: "/api/v1/articles",
+          articleSearch: "/api/v1/articles/search",
+          articleByTitle: "/api/v1/articles/title/{title}",
+          sourceArticles: "/api/v1/sources/{source}/articles",
+        },
+        legacy: {
+          articles: "/api/articles",
+        },
+      },
+      docs: {
+        openapi: "/openapi.yaml",
+        client: "docs/CLIENT.md",
+      },
+      observability: {
+        metrics: "/metrics",
+      },
+    });
   });
 
   it("GET /metrics returns prometheus text", async () => {

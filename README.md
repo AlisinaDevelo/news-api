@@ -91,6 +91,7 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/` | Service capability document linking API versions, docs, and observability endpoints. |
 | `GET` | `/health` | Liveness: `{ "status": "ok", "uptime": number }`. |
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` missing (non-test). |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |

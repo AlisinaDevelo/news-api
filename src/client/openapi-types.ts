@@ -5,6 +5,23 @@
  */
 
 export interface paths {
+    "/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Service capability document */
+        get: operations["getRoot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -211,6 +228,26 @@ export interface components {
                 requestId: string;
             };
         };
+        RootCapabilities: {
+            /** @example news-api */
+            name: string;
+            api: {
+                /** @example v1 */
+                current: string;
+                v1: {
+                    [key: string]: string;
+                };
+                legacy: {
+                    [key: string]: string;
+                };
+            };
+            docs: {
+                [key: string]: string;
+            };
+            observability: {
+                [key: string]: string;
+            };
+        };
         HealthResponse: {
             /** @example ok */
             status: string;
@@ -379,6 +416,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getRoot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Links to API versions, docs, and observability endpoints */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RootCapabilities"];
+                };
+            };
+        };
+    };
     getHealth: {
         parameters: {
             query?: never;
