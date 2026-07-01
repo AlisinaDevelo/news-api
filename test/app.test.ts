@@ -20,11 +20,13 @@ import axios from "axios";
 import app from "../src/app";
 import { sampleArticles } from "./fixtures/articles";
 import { resetCacheStoreForTests, setCacheStoreForTests } from "../src/cache/store";
+import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
 
 describe("app", () => {
   beforeEach(() => {
     mockGet.mockReset();
     resetCacheStoreForTests();
+    resetGNewsCircuitForTests();
   });
 
   it("GET /health returns ok", async () => {
@@ -336,10 +338,30 @@ describe("app", () => {
     });
     expect(typeof res.body.error.requestId).toBe("string");
   });
+
+  it("opens the upstream circuit after repeated provider failures", async () => {
+    mockGet.mockRejectedValue(new axios.AxiosError("timeout"));
+    const q = `circuit-${Math.random().toString(36).slice(2)}`;
+
+    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+    const res = await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatchObject({
+      code: "upstream_circuit_open",
+      message: "Upstream news service temporarily unavailable",
+    });
+    expect(mockGet).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("CLIENT_API_KEYS gate", () => {
   beforeEach(() => {
+    mockGet.mockReset();
+    resetCacheStoreForTests();
+    resetGNewsCircuitForTests();
     vi.stubEnv("CLIENT_API_KEYS", "secret-one");
   });
 

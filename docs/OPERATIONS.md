@@ -10,6 +10,8 @@
 | `LOG_LEVEL` | `info` (non-test) | Pino level (`trace`–`fatal`, or `silent`). |
 | `GNEWS_BASE_URL` | `https://gnews.io/api/v4` | Upstream provider base URL. Override only for local integration tests, benchmarks, or compatible provider mocks. |
 | `HTTP_TIMEOUT_MS` | `15000` | Outbound GNews request timeout (max `60000`). |
+| `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Consecutive provider failures before the circuit opens. |
+| `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
 | `RATE_LIMIT_MAX` | `120` | Max requests per IP per window. |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window. |
@@ -52,8 +54,9 @@ On shutdown the server closes the Redis connection when that backend was used.
 | `news_cache_errors_total` | `operation=get|set` | Cache backend errors that were tolerated by falling through to upstream or returning an uncached upstream response. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
 | `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload` | GNews provider request latency histogram. |
+| `news_upstream_circuit_events_total` | `event=opened|short_circuit|half_open|closed` | Provider circuit breaker state transitions and short-circuited requests. |
 
-Use cache hit rate and coalesced miss counts to understand quota protection, cache error metrics to detect Redis/backend trouble, and upstream latency/error metrics to separate provider trouble from local API trouble.
+Use cache hit rate and coalesced miss counts to understand quota protection, cache error metrics to detect Redis/backend trouble, upstream latency/error metrics to separate provider trouble from local API trouble, and circuit events to see when repeated provider failures are being shed locally.
 
 ## Docker
 

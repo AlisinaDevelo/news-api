@@ -103,6 +103,8 @@ paths:
           description: Rate limit exceeded
         "502":
           $ref: "#/components/responses/V1BadGateway"
+        "503":
+          $ref: "#/components/responses/V1ServiceUnavailable"
         "500":
           $ref: "#/components/responses/V1InternalError"
 
@@ -137,6 +139,8 @@ paths:
           description: Rate limit exceeded
         "502":
           $ref: "#/components/responses/V1BadGateway"
+        "503":
+          $ref: "#/components/responses/V1ServiceUnavailable"
         "500":
           $ref: "#/components/responses/V1InternalError"
 
@@ -173,6 +177,8 @@ paths:
           description: Rate limit exceeded
         "502":
           $ref: "#/components/responses/V1BadGateway"
+        "503":
+          $ref: "#/components/responses/V1ServiceUnavailable"
         "500":
           $ref: "#/components/responses/V1InternalError"
 
@@ -211,6 +217,8 @@ paths:
           description: Rate limit exceeded
         "502":
           $ref: "#/components/responses/V1BadGateway"
+        "503":
+          $ref: "#/components/responses/V1ServiceUnavailable"
         "500":
           $ref: "#/components/responses/V1InternalError"
 
@@ -293,6 +301,8 @@ paths:
           description: Rate limit exceeded
         "502":
           $ref: "#/components/responses/BadGateway"
+        "503":
+          description: Upstream provider circuit breaker is open
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -334,6 +344,8 @@ paths:
           description: Rate limit exceeded
         "502":
           $ref: "#/components/responses/BadGateway"
+        "503":
+          description: Upstream provider circuit breaker is open
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -416,6 +428,8 @@ paths:
           description: Rate limit exceeded
         "502":
           $ref: "#/components/responses/BadGateway"
+        "503":
+          description: Upstream provider circuit breaker is open
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -536,6 +550,12 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     V1InternalError:
       description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    V1ServiceUnavailable:
+      description: Upstream provider circuit breaker is open
       content:
         application/json:
           schema:

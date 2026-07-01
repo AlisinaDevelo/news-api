@@ -39,3 +39,10 @@ export const upstreamRequestDurationSeconds = new Histogram({
   buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 15],
   registers: [register],
 });
+
+export const upstreamCircuitEventsTotal = new Counter({
+  name: "news_upstream_circuit_events_total",
+  help: "Total upstream provider circuit breaker events",
+  labelNames: ["event"],
+  registers: [register],
+});
