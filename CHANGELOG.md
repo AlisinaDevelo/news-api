@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker healthcheck now honors the runtime `PORT` environment variable.
 - Versioned `/api/v1/*` endpoints with `{ data, meta }` response envelopes, cache metadata, and structured error bodies.
 
+### Changed
+
+- Split GNews-specific provider mapping and payload validation into a provider adapter, leaving the news service focused on cache/search orchestration.
+
 ### Security
 
 - Refreshed the dependency lockfile and upgraded OpenTelemetry packages; `npm audit --omit=dev` reports zero vulnerabilities.

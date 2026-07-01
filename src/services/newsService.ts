@@ -1,18 +1,10 @@
-import axios from "axios";
 import { Article } from "../types/article";
-import { HttpError } from "../errors/HttpError";
 import { CacheStore, getCacheStore } from "../cache/store";
-import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
-import {
-  cacheErrorsTotal,
-  cacheEventsTotal,
-  upstreamRequestDurationSeconds,
-  upstreamRequestsTotal,
-} from "../metrics/register";
+import { cacheErrorsTotal, cacheEventsTotal } from "../metrics/register";
 import { logger } from "../logger";
+import { newsProvider } from "../providers/gnewsProvider";
 
-const API_KEY = process.env.GNEWS_API_KEY;
 const inFlightSearches = new Map<string, Promise<ArticleSearchResult>>();
 
 export type ArticleSearchCacheStatus = "hit" | "miss" | "coalesced";
@@ -20,18 +12,6 @@ export type ArticleSearchCacheStatus = "hit" | "miss" | "coalesced";
 export interface ArticleSearchResult {
   articles: Article[];
   cache: ArticleSearchCacheStatus;
-}
-
-function normalizeArticles(data: unknown): Article[] {
-  if (
-    data === null ||
-    typeof data !== "object" ||
-    !("articles" in data) ||
-    !Array.isArray((data as { articles: unknown }).articles)
-  ) {
-    throw new HttpError(502, "Invalid response from news provider", "invalid_provider_payload");
-  }
-  return (data as { articles: Article[] }).articles;
 }
 
 function searchCacheKey(options: ArticleSearchOptions): string {
@@ -44,19 +24,6 @@ function searchCacheKey(options: ArticleSearchOptions): string {
     to: options.to ?? null,
     sortBy: options.sortBy ?? null,
   });
-}
-
-function toProviderParams(options: ArticleSearchOptions): Record<string, string | number | undefined> {
-  return {
-    q: options.query,
-    max: options.count,
-    token: API_KEY,
-    lang: options.lang,
-    country: options.country,
-    from: options.from,
-    to: options.to,
-    sortby: options.sortBy,
-  };
 }
 
 async function readCachedArticles(
@@ -98,29 +65,7 @@ async function fetchArticlesFromUpstream(
   store: CacheStore,
   cacheKey: string
 ): Promise<ArticleSearchResult> {
-  const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
-  let articles: Article[];
-  try {
-    const response = await axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
-      params: toProviderParams(options),
-      timeout: UPSTREAM_TIMEOUT_MS,
-      validateStatus: (s) => s >= 200 && s < 300,
-    });
-
-    articles = normalizeArticles(response.data);
-    upstreamRequestsTotal.inc({ outcome: "success" });
-    stopUpstreamTimer({ outcome: "success" });
-  } catch (err) {
-    const outcome =
-      err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
-    upstreamRequestsTotal.inc({ outcome });
-    stopUpstreamTimer({ outcome });
-    if (axios.isAxiosError(err)) {
-      throw new HttpError(502, "Upstream news service unavailable", "upstream_unavailable");
-    }
-    throw err;
-  }
-
+  const articles = await newsProvider.search(options);
   await writeCachedArticles(store, cacheKey, articles);
   return { articles, cache: "miss" };
 }

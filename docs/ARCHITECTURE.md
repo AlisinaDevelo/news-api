@@ -9,13 +9,14 @@ flowchart LR
   Routes --> Controllers
   Controllers --> NewsService
   NewsService --> Cache
-  NewsService --> GNews["GNews API"]
+  NewsService --> Provider["GNews provider adapter"]
+  Provider --> GNews["GNews API"]
 ```
 
 1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented.
 2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`), then mounts `/api` routes.
 3. **Controllers** validate query parameters and map domain results to HTTP status codes.
-4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and otherwise calls GNews `/api/v4/search` via `axios`. Cache backend errors are logged and metriced without failing the article request.
+4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and delegates upstream fetches to the GNews provider adapter. Cache backend errors are logged and metriced without failing the article request.
 5. **Response mapping** keeps legacy `/api/articles*` endpoints backward compatible with raw arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with `requestId`, normalized filters, and cache status.
 6. **Title** and **source** endpoints reuse the search call, then narrow results in memory (exact title match; case-insensitive source name match).
 
@@ -41,8 +42,8 @@ sequenceDiagram
     Cache-->>Svc: articles
   else miss (read fail falls through here too)
     Svc->>Svc: coalesce identical in-flight misses
-    Svc->>GNews: GET /api/v4/search (timeout)
-    GNews-->>Svc: articles  (502 on provider/transport error)
+    Svc->>GNews: provider adapter: GET /api/v4/search (timeout)
+    GNews-->>Svc: normalized articles  (502 on provider/transport error)
     Svc->>Cache: set(key, articles, TTL 600s)
   end
   Svc-->>API: articles
