@@ -252,6 +252,27 @@ describe("app", () => {
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
+  it("returns stale cached articles when upstream fails after a fresh miss", async () => {
+    const staleArticles = sampleArticles.slice(0, 1);
+    setCacheStoreForTests({
+      async get(key) {
+        return key.endsWith(":stale") ? staleArticles : undefined;
+      },
+      async set() {
+        return undefined;
+      },
+    });
+    mockGet.mockRejectedValueOnce(new axios.AxiosError("timeout"));
+
+    const q = `stale-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(staleArticles);
+    expect(res.body.meta.cache).toBe("stale");
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
   it("coalesces identical in-flight cache misses", async () => {
     mockGet.mockImplementationOnce(
       () =>

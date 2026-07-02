@@ -705,7 +705,7 @@ components:
           additionalProperties: true
         cache:
           type: string
-          enum: [hit, miss, coalesced]
+          enum: [hit, miss, coalesced, stale]
         requestId:
           type: string
 

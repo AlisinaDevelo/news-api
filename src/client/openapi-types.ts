@@ -285,7 +285,7 @@ export interface components {
                 [key: string]: unknown;
             };
             /** @enum {string} */
-            cache: "hit" | "miss" | "coalesced";
+            cache: "hit" | "miss" | "coalesced" | "stale";
             requestId: string;
         };
         ArticleSearchEnvelope: {

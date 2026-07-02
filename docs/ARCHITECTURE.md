@@ -24,8 +24,8 @@ flowchart LR
 ### A search, end to end
 
 The cache is an optimization, not a dependency: hits skip the provider, misses are
-coalesced per process, and cache failures fall through to the upstream rather than failing
-the request.
+coalesced per process, cache failures fall through to the upstream rather than failing
+the request, and stale copies can serve reads when the provider fails.
 
 ```mermaid
 sequenceDiagram
@@ -44,8 +44,12 @@ sequenceDiagram
   else miss (read fail falls through here too)
     Svc->>Svc: coalesce identical in-flight misses
     Svc->>GNews: provider adapter: GET /api/v4/search (timeout)
-    GNews-->>Svc: normalized articles  (502 on provider/transport error)
+    GNews-->>Svc: normalized articles
     Svc->>Cache: set(key, articles, TTL 600s)
+    Svc->>Cache: set(stale key, articles, longer TTL)
+  else upstream failure and stale copy exists
+    Svc->>Cache: get(stale key)
+    Cache-->>Svc: stale articles
   end
   Svc-->>API: articles
   API-->>Client: 200 + results (legacy) or { data, meta } (v1)
@@ -86,10 +90,12 @@ Article arrays are stored per normalized search key with a **600-second** TTL (`
 
 The service treats the cache as a quota and latency optimization, not as a hard dependency. Read failures fall through to the upstream provider, write failures return the upstream response without caching it, and both paths emit warning logs plus cache error metrics. Within a single process, concurrent misses for the same normalized key are coalesced so only the first request calls the provider.
 
+Successful upstream searches write both a fresh cache key and a longer-lived stale key. The fresh key protects latency and quota under normal conditions; the stale key is only read after an upstream failure. Versioned responses expose this through `meta.cache=stale`.
+
 ## Provider Circuit Breaker
 
 The GNews provider adapter tracks consecutive provider failures. After `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` failures, it opens a cooldown window (`UPSTREAM_CIRCUIT_COOLDOWN_MS`) and returns `503` without making another upstream call. After the cooldown, one request is allowed through; success closes the circuit, while another failure opens it again.
 
 ## Metrics
 
-`src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts, while `newsService` and the provider adapter record cache hits/misses/errors/coalesced misses, upstream request outcomes, upstream latency buckets, and circuit breaker events.
+`src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts, while `newsService` and the provider adapter record cache hits/misses/errors/coalesced/stale misses, upstream request outcomes, upstream latency buckets, and circuit breaker events.

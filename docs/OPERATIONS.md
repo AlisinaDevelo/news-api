@@ -10,6 +10,7 @@
 | `LOG_LEVEL` | `info` (non-test) | Pino level (`trace`–`fatal`, or `silent`). |
 | `GNEWS_BASE_URL` | `https://gnews.io/api/v4` | Upstream provider base URL. Override only for local integration tests, benchmarks, or compatible provider mocks. |
 | `HTTP_TIMEOUT_MS` | `15000` | Outbound GNews request timeout (max `60000`). |
+| `STALE_CACHE_TTL_SEC` | `3600` | Longer-lived stale article cache TTL used only as an upstream-failure fallback (min effective value `>600`, max `86400`). |
 | `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Consecutive provider failures before the circuit opens. |
 | `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
@@ -40,6 +41,7 @@
 - Cache keys include normalized search parameters: query, count, `lang`, `country`, `from`, `to`, and `sortBy`.
 - Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, the service logs a warning, increments cache error metrics, falls through to GNews on read failure, and still returns the upstream response on write failure.
 - Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
+- Successful searches are also written to a longer-lived stale cache key. If a later fresh miss hits an upstream failure and stale data is available, `/api/v1/*` returns `meta.cache=stale` with a `200` response instead of surfacing the provider outage.
 
 On shutdown the server closes the Redis connection when that backend was used.
 
@@ -50,13 +52,13 @@ On shutdown the server closes the Redis connection when that backend was used.
 | Metric | Labels | Purpose |
 |--------|--------|---------|
 | `http_requests_total` | `method`, `status_code` | HTTP response count. |
-| `news_cache_events_total` | `result=hit|miss|error|coalesced` | Cache lookup and in-flight coalescing behavior for article searches. |
-| `news_cache_errors_total` | `operation=get|set` | Cache backend errors that were tolerated by falling through to upstream or returning an uncached upstream response. |
+| `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
+| `news_cache_errors_total` | `operation=get|set|get_stale|set_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, or skipping stale fallback. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
 | `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload` | GNews provider request latency histogram. |
 | `news_upstream_circuit_events_total` | `event=opened|short_circuit|half_open|closed` | Provider circuit breaker state transitions and short-circuited requests. |
 
-Use cache hit rate and coalesced miss counts to understand quota protection, cache error metrics to detect Redis/backend trouble, upstream latency/error metrics to separate provider trouble from local API trouble, and circuit events to see when repeated provider failures are being shed locally.
+Use cache hit rate and coalesced miss counts to understand quota protection, stale counts to see when provider trouble is being hidden by cached data, cache error metrics to detect Redis/backend trouble, upstream latency/error metrics to separate provider trouble from local API trouble, and circuit events to see when repeated provider failures are being shed locally.
 
 ## Docker
 

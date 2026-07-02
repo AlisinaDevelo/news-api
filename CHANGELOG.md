@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provider circuit breaker for repeated GNews failures, including Prometheus circuit event metrics and `503` short-circuit responses.
 - OpenAPI-generated TypeScript client types, a small v1 `NewsApiClient` wrapper, and CI drift checks for generated client output.
 - Root capability document that advertises v1 routes, legacy routes, docs, and observability endpoints.
+- Stale-on-error article cache fallback with `meta.cache=stale`, stale cache TTL configuration, and Prometheus stale cache metrics.
 
 ### Changed
 

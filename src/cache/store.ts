@@ -6,7 +6,7 @@ const TTL_SEC = 600;
 
 export type CacheStore = {
   get(key: string): Promise<unknown | undefined>;
-  set(key: string, value: unknown): Promise<void>;
+  set(key: string, value: unknown, ttlSec?: number): Promise<void>;
 };
 
 let singleton: CacheStore | null = null;
@@ -18,8 +18,8 @@ function createMemoryStore(): CacheStore {
     async get(key: string) {
       return c.get(key);
     },
-    async set(key: string, value: unknown) {
-      c.set(key, value);
+    async set(key: string, value: unknown, ttlSec = TTL_SEC) {
+      c.set(key, value, ttlSec);
     },
   };
 }
@@ -46,8 +46,8 @@ function createRedisStore(url: string): CacheStore {
         return undefined;
       }
     },
-    async set(key: string, value: unknown) {
-      await client.setex(key, TTL_SEC, JSON.stringify(value));
+    async set(key: string, value: unknown, ttlSec = TTL_SEC) {
+      await client.setex(key, ttlSec, JSON.stringify(value));
     },
   };
 }
