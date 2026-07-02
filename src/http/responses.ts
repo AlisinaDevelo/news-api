@@ -20,6 +20,10 @@ export function sendEnvelope<TData, TMeta extends Record<string, unknown>>(
   data: TData,
   meta: TMeta
 ): void {
+  res.setHeader("X-API-Version", "v1");
+  if (typeof meta.cache === "string" && meta.cache.trim()) {
+    res.setHeader("X-Cache-Status", meta.cache);
+  }
   res.json({
     data,
     meta: {

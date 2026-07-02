@@ -113,6 +113,8 @@ describe("app", () => {
     const res = await request(app).get("/api/v1/articles?query=tech&count=2&lang=EN");
 
     expect(res.status).toBe(200);
+    expect(res.headers["x-api-version"]).toBe("v1");
+    expect(res.headers["x-cache-status"]).toBe("miss");
     expect(res.body).toMatchObject({
       data: sampleArticles,
       meta: {
@@ -133,6 +135,8 @@ describe("app", () => {
     const res = await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=2`);
 
     expect(res.status).toBe(200);
+    expect(res.headers["x-api-version"]).toBe("v1");
+    expect(res.headers["x-cache-status"]).toBe("hit");
     expect(res.body.meta.cache).toBe("hit");
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
@@ -270,6 +274,8 @@ describe("app", () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual(staleArticles);
     expect(res.body.meta.cache).toBe("stale");
+    expect(res.headers["x-api-version"]).toBe("v1");
+    expect(res.headers["x-cache-status"]).toBe("stale");
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
@@ -311,6 +317,7 @@ describe("app", () => {
     const res = await request(app).get(`/api/v1/articles/title/${title}`);
 
     expect(res.status).toBe(200);
+    expect(res.headers["x-api-version"]).toBe("v1");
     expect(res.body.data.title).toBe("Alpha headline");
     expect(res.body.meta).toMatchObject({ title: "Alpha headline" });
     expect(typeof res.body.meta.requestId).toBe("string");
@@ -342,6 +349,7 @@ describe("app", () => {
     const res = await request(app).get("/api/v1/sources/BBC/articles?count=10");
 
     expect(res.status).toBe(200);
+    expect(res.headers["x-api-version"]).toBe("v1");
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].source.name).toBe("BBC");
     expect(res.body.meta).toMatchObject({ source: "BBC", count: 10 });

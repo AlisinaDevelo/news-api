@@ -104,6 +104,11 @@ paths:
       responses:
         "200":
           description: Enveloped article list from provider (possibly cached)
+          headers:
+            X-API-Version:
+              $ref: "#/components/headers/ApiVersion"
+            X-Cache-Status:
+              $ref: "#/components/headers/CacheStatus"
           content:
             application/json:
               schema:
@@ -140,6 +145,11 @@ paths:
       responses:
         "200":
           description: Enveloped article list from provider (possibly cached)
+          headers:
+            X-API-Version:
+              $ref: "#/components/headers/ApiVersion"
+            X-Cache-Status:
+              $ref: "#/components/headers/CacheStatus"
           content:
             application/json:
               schema:
@@ -174,6 +184,9 @@ paths:
       responses:
         "200":
           description: Enveloped matching article
+          headers:
+            X-API-Version:
+              $ref: "#/components/headers/ApiVersion"
           content:
             application/json:
               schema:
@@ -218,6 +231,9 @@ paths:
       responses:
         "200":
           description: Enveloped articles whose source name matches (case-insensitive)
+          headers:
+            X-API-Version:
+              $ref: "#/components/headers/ApiVersion"
           content:
             application/json:
               schema:
@@ -517,6 +533,18 @@ components:
         type: string
         enum: [publishedAt, relevance]
       description: Provider sort order. Forwarded to GNews as `sortby`.
+
+  headers:
+    ApiVersion:
+      description: Version of the stable response envelope contract.
+      schema:
+        type: string
+        enum: [v1]
+    CacheStatus:
+      description: Article-search cache result for this response.
+      schema:
+        type: string
+        enum: [hit, miss, stale]
 
   responses:
     Unauthorized:

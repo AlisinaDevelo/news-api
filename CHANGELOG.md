@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAPI-generated TypeScript client types, a small v1 `NewsApiClient` wrapper, and CI drift checks for generated client output.
 - Root capability document that advertises v1 routes, legacy routes, docs, and observability endpoints.
 - Stale-on-error article cache fallback with `meta.cache=stale`, stale cache TTL configuration, and Prometheus stale cache metrics.
+- Versioned success response headers: `X-API-Version` for `/api/v1/*` envelopes and `X-Cache-Status` for v1 article searches.
 
 ### Changed
 

@@ -411,7 +411,12 @@ export interface components {
         SortBy: "publishedAt" | "relevance";
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Version of the stable response envelope contract. */
+        ApiVersion: "v1";
+        /** @description Article-search cache result for this response. */
+        CacheStatus: "hit" | "miss" | "stale";
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -553,6 +558,8 @@ export interface operations {
             /** @description Enveloped article list from provider (possibly cached) */
             200: {
                 headers: {
+                    "X-API-Version": components["headers"]["ApiVersion"];
+                    "X-Cache-Status": components["headers"]["CacheStatus"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -601,6 +608,8 @@ export interface operations {
             /** @description Enveloped article list from provider (possibly cached) */
             200: {
                 headers: {
+                    "X-API-Version": components["headers"]["ApiVersion"];
+                    "X-Cache-Status": components["headers"]["CacheStatus"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -638,6 +647,7 @@ export interface operations {
             /** @description Enveloped matching article */
             200: {
                 headers: {
+                    "X-API-Version": components["headers"]["ApiVersion"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -695,6 +705,7 @@ export interface operations {
             /** @description Enveloped articles whose source name matches (case-insensitive) */
             200: {
                 headers: {
+                    "X-API-Version": components["headers"]["ApiVersion"];
                     [name: string]: unknown;
                 };
                 content: {

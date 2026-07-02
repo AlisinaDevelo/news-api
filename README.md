@@ -10,7 +10,7 @@ A search runs through a small, explicit pipeline — each stage is a separate, t
 2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set). Cache failures are logged/metriced but do not fail article requests; identical in-flight misses in the same process share one upstream call.
 3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502`, and repeated failures open a short circuit that returns `503` without amplifying the outage.
 4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss/stale fallback, upstream outcome, latency histogram), and optional OpenTelemetry spans.
-5. **Respond** — legacy endpoints return raw article arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with request/cache metadata and structured error bodies.
+5. **Respond** — legacy endpoints return raw article arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with request/cache metadata, `X-API-Version`, cache-status headers for searches, and structured error bodies.
 
 Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -119,7 +119,7 @@ GET /api/articles/source?source=BBC&count=10
 
 Search filters are validated before the upstream request. `lang` and `country` are two-letter codes, `from` and `to` must parse as ISO 8601 dates, and `sortBy` accepts `publishedAt` or `relevance`.
 
-Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Rate limit: `429` with standard rate-limit headers.
+Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses include `X-API-Version: v1`; v1 search responses also include `X-Cache-Status: hit|miss|stale`. Versioned errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Rate limit: `429` with standard rate-limit headers.
 
 ## Scripts
 
