@@ -31,6 +31,7 @@ const client = new NewsApiClient({
 const result = await client.searchArticles({
   query: "postgres",
   count: 5,
+  page: 2,
   lang: "en",
   sortBy: "relevance",
 });

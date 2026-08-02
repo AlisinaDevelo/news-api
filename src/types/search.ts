@@ -11,4 +11,5 @@ export interface ArticleSearchFilters {
 export interface ArticleSearchOptions extends ArticleSearchFilters {
   query: string;
   count: number;
+  page: number;
 }

@@ -96,6 +96,7 @@ paths:
         - $ref: "#/components/parameters/ClientApiKey"
         - $ref: "#/components/parameters/Query"
         - $ref: "#/components/parameters/Count"
+        - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/Lang"
         - $ref: "#/components/parameters/Country"
         - $ref: "#/components/parameters/From"
@@ -137,6 +138,7 @@ paths:
         - $ref: "#/components/parameters/ClientApiKey"
         - $ref: "#/components/parameters/Query"
         - $ref: "#/components/parameters/Count"
+        - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/Lang"
         - $ref: "#/components/parameters/Country"
         - $ref: "#/components/parameters/From"
@@ -223,6 +225,7 @@ paths:
           schema:
             type: string
         - $ref: "#/components/parameters/Count"
+        - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/Lang"
         - $ref: "#/components/parameters/Country"
         - $ref: "#/components/parameters/From"
@@ -278,6 +281,15 @@ paths:
             minimum: 1
             maximum: 100
             default: 10
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 1
+          description: Upstream result page. GNews pagination may require a paid plan.
         - name: lang
           in: query
           required: false
@@ -405,6 +417,15 @@ paths:
             minimum: 1
             maximum: 100
             default: 10
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 1
+          description: Upstream result page. GNews pagination may require a paid plan.
         - name: lang
           in: query
           required: false
@@ -493,6 +514,16 @@ components:
         minimum: 1
         maximum: 100
         default: 10
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 1
+      description: Upstream result page. GNews pagination may require a paid plan.
     Lang:
       name: lang
       in: query
@@ -722,12 +753,15 @@ components:
 
     ArticleSearchMeta:
       type: object
-      required: [query, count, filters, cache, requestId]
+      required: [query, count, page, filters, cache, requestId]
       properties:
         query:
           type: string
         count:
           type: integer
+        page:
+          type: integer
+          minimum: 1
         filters:
           type: object
           additionalProperties: true
@@ -773,12 +807,15 @@ components:
             $ref: "#/components/schemas/Article"
         meta:
           type: object
-          required: [source, count, filters, requestId]
+          required: [source, count, page, filters, requestId]
           properties:
             source:
               type: string
             count:
               type: integer
+            page:
+              type: integer
+              minimum: 1
             filters:
               type: object
               additionalProperties: true

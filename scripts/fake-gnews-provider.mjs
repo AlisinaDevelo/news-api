@@ -38,7 +38,11 @@ const server = http.createServer((req, res) => {
 
   const query = url.searchParams.get("q") ?? "news";
   const count = Math.max(1, Math.min(Number(url.searchParams.get("max") ?? 3), 100));
-  const articles = Array.from({ length: count }, (_, index) => articleFor(query, index));
+  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+  const offset = (page - 1) * count;
+  const articles = Array.from({ length: count }, (_, index) =>
+    articleFor(query, offset + index)
+  );
 
   setTimeout(() => sendJson(res, 200, { articles }), delayMs);
 });

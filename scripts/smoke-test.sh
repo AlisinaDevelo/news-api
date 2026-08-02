@@ -4,6 +4,7 @@ set -eu
 BASE_URL="${BASE_URL:-http://localhost:3000}"
 QUERY="${QUERY:-technology}"
 COUNT="${COUNT:-3}"
+PAGE="${PAGE:-1}"
 
 TMP_BODY="$(mktemp)"
 TMP_HEADERS="$(mktemp)"
@@ -133,7 +134,7 @@ expect_api_response() {
 ENCODED_QUERY="$(url_encode "$QUERY")"
 V1_QUERY="${QUERY}-v1-smoke-$(date +%s)-$$"
 ENCODED_V1_QUERY="$(url_encode "$V1_QUERY")"
-V1_URL="$BASE_URL/api/v1/articles?query=$ENCODED_V1_QUERY&count=$COUNT"
+V1_URL="$BASE_URL/api/v1/articles?query=$ENCODED_V1_QUERY&count=$COUNT&page=$PAGE"
 
 echo "Smoke testing $BASE_URL"
 expect_status "health" "200" "$BASE_URL/health"

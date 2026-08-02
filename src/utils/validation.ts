@@ -1,4 +1,9 @@
-import { DEFAULT_ARTICLE_COUNT, MAX_ARTICLE_COUNT } from "../constants";
+import {
+  DEFAULT_ARTICLE_COUNT,
+  DEFAULT_ARTICLE_PAGE,
+  MAX_ARTICLE_COUNT,
+  MAX_ARTICLE_PAGE,
+} from "../constants";
 import { HttpError } from "../errors/HttpError";
 import { ArticleSearchFilters, ArticleSortBy } from "../types/search";
 
@@ -13,6 +18,17 @@ export function parseArticleCount(raw: unknown): number {
     throw new HttpError(400, "count must be a positive integer", "invalid_count");
   }
   return Math.min(n, MAX_ARTICLE_COUNT);
+}
+
+export function parseArticlePage(raw: unknown): number {
+  if (raw === undefined || raw === null || raw === "") {
+    return DEFAULT_ARTICLE_PAGE;
+  }
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new HttpError(400, "page must be a positive integer", "invalid_page");
+  }
+  return Math.min(n, MAX_ARTICLE_PAGE);
 }
 
 export function requireQueryString(value: unknown, fieldName: string): string {

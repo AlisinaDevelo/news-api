@@ -29,12 +29,17 @@ describe("NewsApiClient", () => {
       fetchImpl,
     });
 
-    const result = await client.searchArticles({ query: "postgres", count: 2, lang: "en" });
+    const result = await client.searchArticles({
+      query: "postgres",
+      count: 2,
+      page: 2,
+      lang: "en",
+    });
 
     expect(result.data).toEqual(sampleArticles);
     expect(result.meta.cache).toBe("miss");
     expect(fetchImpl).toHaveBeenCalledWith(
-      new URL("https://news-api.example/api/v1/articles?query=postgres&count=2&lang=en"),
+      new URL("https://news-api.example/api/v1/articles?query=postgres&count=2&page=2&lang=en"),
       { headers: { "X-API-Key": "client-key" } }
     );
   });

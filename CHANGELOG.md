@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stale-on-error article cache fallback with `meta.cache=stale`, stale cache TTL configuration, and Prometheus stale cache metrics.
 - Versioned success response headers: `X-API-Version` for `/api/v1/*` envelopes and `X-Cache-Status` for v1 article searches.
 - Docker smoke coverage for the v1 response headers and fresh-cache `miss` to warm-cache `hit` transition.
+- Optional bounded pagination for article searches, forwarded to GNews and included in cache keys and v1 metadata.
 
 ### Changed
 

@@ -1,12 +1,12 @@
 # news-api
 
-**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Searches support provider-backed filters for language, country, date range, and sort order. Identical normalized searches are cached (in-memory by default, or **Redis** when `REDIS_URL` is set) to protect quota and latency. The upstream base URL is injectable for deterministic local integration tests and benchmarks.
+**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Searches support provider-backed filters for language, country, date range, sort order, and bounded pagination. Identical normalized searches are cached (in-memory by default, or **Redis** when `REDIS_URL` is set) to protect quota and latency. The upstream base URL is injectable for deterministic local integration tests and benchmarks.
 
 ## How a request flows
 
 A search runs through a small, explicit pipeline — each stage is a separate, testable unit:
 
-1. **Validate** — query params are checked before any network call: `query` is required, `count` is clamped (≤100), `lang`/`country` must be ISO two-letter codes, `from`/`to` must parse as ISO 8601, and `sortBy` ∈ {`publishedAt`, `relevance`}. Bad input fails fast with `400` instead of wasting an upstream call or quota.
+1. **Validate** — query params are checked before any network call: `query` is required, `count` is clamped (≤100), `page` is bounded (≤100), `lang`/`country` must be ISO two-letter codes, `from`/`to` must parse as ISO 8601, and `sortBy` ∈ {`publishedAt`, `relevance`}. Bad input fails fast with `400` instead of wasting an upstream call or quota.
 2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set). Cache failures are logged/metriced but do not fail article requests; identical in-flight misses in the same process share one upstream call.
 3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502`, and repeated failures open a short circuit that returns `503` without amplifying the outage.
 4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss/stale fallback, upstream outcome, latency histogram), and optional OpenTelemetry spans.
@@ -96,20 +96,20 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` missing (non-test). |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
 | `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, cache hit/miss/stale/error/coalescing counts, and upstream latency. |
-| `GET` | `/api/v1/articles` | Versioned search. Returns `{ data, meta }`, including normalized filters, cache status, and `requestId`. |
+| `GET` | `/api/v1/articles` | Versioned search. Returns `{ data, meta }`, including `count`, `page`, normalized filters, cache status, and `requestId`. |
 | `GET` | `/api/v1/articles/search` | Alias for versioned search. |
 | `GET` | `/api/v1/articles/title/:title` | Exact title match with `{ data, meta }`, else structured `404`. |
-| `GET` | `/api/v1/sources/:source/articles` | Source-name filter with `{ data, meta }`. |
-| `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100), plus optional `lang`, `country`, `from`, `to`, `sortBy`. Optional header `X-API-Key` if `CLIENT_API_KEYS` is set. |
+| `GET` | `/api/v1/sources/:source/articles` | Source-name filter with `{ data, meta }`, including `count`, `page`, and normalized filters. |
+| `GET` | `/api/articles` | Search. Query: `query` (required), `count` (optional, default 10, max 100), `page` (optional, default 1, max 100), plus optional `lang`, `country`, `from`, `to`, `sortBy`. Optional header `X-API-Key` if `CLIENT_API_KEYS` is set. |
 | `GET` | `/api/articles/title/:title` | Exact title match in the current search window, else `404`. |
-| `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` optional, plus optional `lang`, `country`, `from`, `to`, `sortBy`. |
+| `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` and `page` optional, plus optional `lang`, `country`, `from`, `to`, `sortBy`. |
 
 **Examples**
 
 ```http
-GET /api/v1/articles?query=technology&count=5
+GET /api/v1/articles?query=technology&count=5&page=2
 GET /api/v1/articles/search?query=postgres&lang=en&country=us&sortBy=relevance
-GET /api/v1/sources/BBC/articles?count=10
+GET /api/v1/sources/BBC/articles?count=10&page=2
 GET /api/articles?query=technology&count=5
 GET /api/articles?query=postgres&lang=en&country=us&sortBy=relevance
 GET /api/articles?query=aws&from=2026-01-01T00:00:00Z&to=2026-01-31T23:59:59Z
@@ -117,7 +117,7 @@ GET /api/articles/title/Example%20Headline
 GET /api/articles/source?source=BBC&count=10
 ```
 
-Search filters are validated before the upstream request. `lang` and `country` are two-letter codes, `from` and `to` must parse as ISO 8601 dates, and `sortBy` accepts `publishedAt` or `relevance`.
+Search parameters are validated before the upstream request. `page` is bounded to 100, `lang` and `country` are two-letter codes, `from` and `to` must parse as ISO 8601 dates, and `sortBy` accepts `publishedAt` or `relevance`. GNews pagination may require a paid plan.
 
 Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses include `X-API-Version: v1`; v1 search responses also include `X-Cache-Status: hit|miss|stale`. Versioned errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Rate limit: `429` with standard rate-limit headers.
 
@@ -135,7 +135,7 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses
 | `npm run contract` | Validate `docs/openapi.yaml` with Redocly CLI. |
 | `npm run client:generate` | Generate TypeScript client types from `docs/openapi.yaml`. |
 | `npm run client:check` | Regenerate client types and fail if checked-in output is stale. |
-| `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, optional `CLIENT_API_KEY`). |
+| `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, `PAGE`, optional `CLIENT_API_KEY`). |
 | `npm run smoke:docker` | Compose smoke test: boot the image against a fake GNews provider and run `npm run smoke`. |
 | `npm run benchmark:local` | Builds the app, starts a fake GNews provider, and measures cold searches vs warm cache hits. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md). |
 

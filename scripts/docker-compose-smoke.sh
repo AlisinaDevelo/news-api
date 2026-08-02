@@ -33,4 +33,4 @@ while [ "$attempt" -le 30 ]; do
   sleep 2
 done
 
-BASE_URL="$BASE_URL" QUERY="${QUERY:-ci-smoke}" COUNT="${COUNT:-3}" npm run smoke
+BASE_URL="$BASE_URL" QUERY="${QUERY:-ci-smoke}" COUNT="${COUNT:-3}" PAGE="${PAGE:-2}" npm run smoke

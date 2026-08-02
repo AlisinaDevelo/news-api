@@ -97,7 +97,7 @@ describe("OpenAPI response contract", () => {
     mockGet.mockReset();
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
 
-    const res = await request(app).get("/api/v1/articles?query=contract&count=2");
+    const res = await request(app).get("/api/v1/articles?query=contract&count=2&page=2");
 
     expect(res.status).toBe(200);
     expectValidResponse(responseValidator("/api/v1/articles", 200), res.body);

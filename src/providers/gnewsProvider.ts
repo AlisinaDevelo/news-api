@@ -123,6 +123,7 @@ function toProviderParams(options: ArticleSearchOptions): Record<string, string 
   return {
     q: options.query,
     max: options.count,
+    page: options.page,
     token: process.env.GNEWS_API_KEY,
     lang: options.lang,
     country: options.country,

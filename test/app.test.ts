@@ -110,7 +110,7 @@ describe("app", () => {
 
   it("GET /api/v1/articles returns an enveloped search response", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
-    const res = await request(app).get("/api/v1/articles?query=tech&count=2&lang=EN");
+    const res = await request(app).get("/api/v1/articles?query=tech&count=2&page=2&lang=EN");
 
     expect(res.status).toBe(200);
     expect(res.headers["x-api-version"]).toBe("v1");
@@ -120,6 +120,7 @@ describe("app", () => {
       meta: {
         query: "tech",
         count: 2,
+        page: 2,
         filters: { lang: "en" },
         cache: "miss",
       },
@@ -153,7 +154,7 @@ describe("app", () => {
   it("GET /api/articles forwards validated search filters", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const res = await request(app).get(
-      "/api/articles?query=tech&count=2&lang=EN&country=us&from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z&sortBy=relevance"
+      "/api/articles?query=tech&count=2&page=2&lang=EN&country=us&from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z&sortBy=relevance"
     );
     expect(res.status).toBe(200);
     expect(mockGet).toHaveBeenCalledWith(
@@ -162,6 +163,7 @@ describe("app", () => {
         params: expect.objectContaining({
           q: "tech",
           max: 2,
+          page: 2,
           lang: "en",
           country: "us",
           from: "2026-01-01T00:00:00.000Z",
@@ -200,6 +202,16 @@ describe("app", () => {
       `/api/articles?query=${encodeURIComponent(q)}&count=2&lang=en&country=us&from=2026-01-01T00:00:00.000Z`
     );
     expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps separate cache entries for different result pages", async () => {
+    mockGet.mockResolvedValue({ data: { articles: sampleArticles } });
+    const q = `paged-${Math.random().toString(36).slice(2)}`;
+
+    await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2&page=1`);
+    await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2&page=2`);
+
+    expect(mockGet).toHaveBeenCalledTimes(2);
   });
 
   it("records cache and upstream metrics for article searches", async () => {
@@ -346,13 +358,13 @@ describe("app", () => {
 
   it("GET /api/v1/sources/:source/articles filters by source name with envelope", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
-    const res = await request(app).get("/api/v1/sources/BBC/articles?count=10");
+    const res = await request(app).get("/api/v1/sources/BBC/articles?count=10&page=2");
 
     expect(res.status).toBe(200);
     expect(res.headers["x-api-version"]).toBe("v1");
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].source.name).toBe("BBC");
-    expect(res.body.meta).toMatchObject({ source: "BBC", count: 10 });
+    expect(res.body.meta).toMatchObject({ source: "BBC", count: 10, page: 2 });
   });
 
   it("returns 500 when upstream request fails", async () => {

@@ -7,6 +7,7 @@ import {
 } from "../services/newsService";
 import {
   parseArticleCount,
+  parseArticlePage,
   parseArticleSearchFilters,
   requireQueryString,
 } from "../utils/validation";
@@ -16,20 +17,23 @@ import { sendEnvelope } from "../http/responses";
 export const getArticles = async (req: Request, res: Response): Promise<void> => {
   const q = requireQueryString(req.query.query, "query");
   const count = parseArticleCount(req.query.count);
+  const page = parseArticlePage(req.query.page);
   const filters = parseArticleSearchFilters(req.query);
-  const articles = await fetchArticles({ query: q, count, ...filters });
+  const articles = await fetchArticles({ query: q, count, page, ...filters });
   res.json(articles);
 };
 
 export const searchArticlesV1 = async (req: Request, res: Response): Promise<void> => {
   const query = requireQueryString(req.query.query, "query");
   const count = parseArticleCount(req.query.count);
+  const page = parseArticlePage(req.query.page);
   const filters = parseArticleSearchFilters(req.query);
-  const result = await searchArticles({ query, count, ...filters });
+  const result = await searchArticles({ query, count, page, ...filters });
 
   sendEnvelope(req, res, result.articles, {
     query,
     count,
+    page,
     filters,
     cache: result.cache,
   });
@@ -57,20 +61,23 @@ export const getArticlesByTitleV1 = async (req: Request, res: Response): Promise
 export const getArticlesBySource = async (req: Request, res: Response): Promise<void> => {
   const source = requireQueryString(req.query.source, "source");
   const count = parseArticleCount(req.query.count);
+  const page = parseArticlePage(req.query.page);
   const filters = parseArticleSearchFilters(req.query);
-  const articles = await fetchArticlesBySource(source, count, filters);
+  const articles = await fetchArticlesBySource(source, count, filters, page);
   res.json(articles);
 };
 
 export const getArticlesBySourceV1 = async (req: Request, res: Response): Promise<void> => {
   const source = requireQueryString(req.params.source, "source");
   const count = parseArticleCount(req.query.count);
+  const page = parseArticlePage(req.query.page);
   const filters = parseArticleSearchFilters(req.query);
-  const articles = await fetchArticlesBySource(source, count, filters);
+  const articles = await fetchArticlesBySource(source, count, filters, page);
 
   sendEnvelope(req, res, articles, {
     source,
     count,
+    page,
     filters,
   });
 };

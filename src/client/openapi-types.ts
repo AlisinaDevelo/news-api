@@ -281,6 +281,7 @@ export interface components {
         ArticleSearchMeta: {
             query: string;
             count: number;
+            page: number;
             filters: {
                 [key: string]: unknown;
             };
@@ -304,6 +305,7 @@ export interface components {
             meta: {
                 source: string;
                 count: number;
+                page: number;
                 filters: {
                     [key: string]: unknown;
                 };
@@ -399,6 +401,8 @@ export interface components {
         ClientApiKey: string;
         Query: string;
         Count: number;
+        /** @description Upstream result page. GNews pagination may require a paid plan. */
+        Page: number;
         /** @description Two-letter article language code. */
         Lang: string;
         /** @description Two-letter source country code. */
@@ -535,6 +539,8 @@ export interface operations {
             query: {
                 query: components["parameters"]["Query"];
                 count?: components["parameters"]["Count"];
+                /** @description Upstream result page. GNews pagination may require a paid plan. */
+                page?: components["parameters"]["Page"];
                 /** @description Two-letter article language code. */
                 lang?: components["parameters"]["Lang"];
                 /** @description Two-letter source country code. */
@@ -585,6 +591,8 @@ export interface operations {
             query: {
                 query: components["parameters"]["Query"];
                 count?: components["parameters"]["Count"];
+                /** @description Upstream result page. GNews pagination may require a paid plan. */
+                page?: components["parameters"]["Page"];
                 /** @description Two-letter article language code. */
                 lang?: components["parameters"]["Lang"];
                 /** @description Two-letter source country code. */
@@ -680,6 +688,8 @@ export interface operations {
         parameters: {
             query?: {
                 count?: components["parameters"]["Count"];
+                /** @description Upstream result page. GNews pagination may require a paid plan. */
+                page?: components["parameters"]["Page"];
                 /** @description Two-letter article language code. */
                 lang?: components["parameters"]["Lang"];
                 /** @description Two-letter source country code. */
@@ -731,6 +741,8 @@ export interface operations {
             query: {
                 query: string;
                 count?: number;
+                /** @description Upstream result page. GNews pagination may require a paid plan. */
+                page?: number;
                 /** @description Two-letter article language code. */
                 lang?: string;
                 /** @description Two-letter source country code. */
@@ -836,6 +848,8 @@ export interface operations {
             query: {
                 source: string;
                 count?: number;
+                /** @description Upstream result page. GNews pagination may require a paid plan. */
+                page?: number;
                 /** @description Two-letter article language code. */
                 lang?: string;
                 /** @description Two-letter source country code. */

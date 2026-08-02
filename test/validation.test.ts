@@ -1,11 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
   parseArticleCount,
+  parseArticlePage,
   parseArticleSearchFilters,
   requireQueryString,
 } from "../src/utils/validation";
 import { HttpError } from "../src/errors/HttpError";
-import { DEFAULT_ARTICLE_COUNT, MAX_ARTICLE_COUNT } from "../src/constants";
+import {
+  DEFAULT_ARTICLE_COUNT,
+  DEFAULT_ARTICLE_PAGE,
+  MAX_ARTICLE_COUNT,
+  MAX_ARTICLE_PAGE,
+} from "../src/constants";
 
 describe("parseArticleCount", () => {
   it("defaults when omitted", () => {
@@ -25,6 +31,28 @@ describe("parseArticleCount", () => {
     expect(() => parseArticleCount("0")).toThrow(HttpError);
     expect(() => parseArticleCount("-1")).toThrow(HttpError);
     expect(() => parseArticleCount("nope")).toThrow(HttpError);
+  });
+});
+
+describe("parseArticlePage", () => {
+  it("defaults when omitted", () => {
+    expect(parseArticlePage(undefined)).toBe(DEFAULT_ARTICLE_PAGE);
+    expect(parseArticlePage("")).toBe(DEFAULT_ARTICLE_PAGE);
+  });
+
+  it("parses valid page numbers", () => {
+    expect(parseArticlePage("5")).toBe(5);
+  });
+
+  it("caps at max", () => {
+    expect(parseArticlePage(String(MAX_ARTICLE_PAGE + 50))).toBe(MAX_ARTICLE_PAGE);
+  });
+
+  it("rejects non-positive pages", () => {
+    expect(() => parseArticlePage("0")).toThrow(HttpError);
+    expect(() => parseArticlePage("-1")).toThrow(HttpError);
+    expect(() => parseArticlePage("nope")).toThrow(HttpError);
+    expect(() => parseArticlePage("2.5")).toThrow(HttpError);
   });
 });
 

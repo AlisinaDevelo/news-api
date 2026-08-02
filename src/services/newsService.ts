@@ -19,6 +19,7 @@ function searchCacheKey(options: ArticleSearchOptions): string {
   return JSON.stringify({
     query: options.query,
     count: options.count,
+    page: options.page,
     lang: options.lang ?? null,
     country: options.country ?? null,
     from: options.from ?? null,
@@ -148,16 +149,17 @@ export const fetchArticles = async (options: ArticleSearchOptions): Promise<Arti
 };
 
 export const fetchArticlesByTitle = async (title: string): Promise<Article | undefined> => {
-  const articles = await fetchArticles({ query: title, count: 10 });
+  const articles = await fetchArticles({ query: title, count: 10, page: 1 });
   return articles.find((article) => article.title === title);
 };
 
 export const fetchArticlesBySource = async (
   sourceName: string,
   count: number,
-  filters: ArticleSearchFilters = {}
+  filters: ArticleSearchFilters = {},
+  page = 1
 ): Promise<Article[]> => {
-  const articles = await fetchArticles({ query: sourceName, count, ...filters });
+  const articles = await fetchArticles({ query: sourceName, count, page, ...filters });
   const target = sourceName.toLowerCase();
   return articles.filter((article) => article.source.name.toLowerCase() === target);
 };
