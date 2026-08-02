@@ -376,6 +376,15 @@ describe("app", () => {
     expect(res.body.error).toBe("Invalid response from news provider");
   });
 
+  it("returns 502 when provider returns an invalid article shape", async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { articles: [{ ...sampleArticles[0], source: { name: "BBC" } }] },
+    });
+    const res = await request(app).get("/api/articles?query=badarticle&count=1");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("Invalid response from news provider");
+  });
+
   it("GET /api/v1/articles returns structured errors", async () => {
     const res = await request(app).get("/api/v1/articles");
 
