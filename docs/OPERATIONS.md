@@ -87,7 +87,9 @@ If `CLIENT_API_KEYS` is configured, pass a matching client key:
 CLIENT_API_KEY=client-secret-one npm run smoke
 ```
 
-The smoke test checks `/health`, `/ready`, `/openapi.yaml`, `/api/articles`, and `/metrics`.
+The smoke test checks `/health`, `/ready`, `/openapi.yaml`, the legacy `/api/articles` route,
+and two versioned searches. The v1 checks verify `X-API-Version: v1` and the expected
+`X-Cache-Status: miss` then `hit` transition before checking `/metrics`.
 
 To smoke-test the production container without a live GNews key, boot the CI Compose stack against the fake provider:
 
