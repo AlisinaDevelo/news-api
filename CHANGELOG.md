@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- Refreshed the dependency lockfile and upgraded OpenTelemetry packages; `npm audit --omit=dev` reports zero vulnerabilities.
+- Refreshed OpenTelemetry packages and the dependency lockfile; `npm audit --audit-level=high` reports zero vulnerabilities.
 
 ## [1.2.0] — 2026-04-05
 
