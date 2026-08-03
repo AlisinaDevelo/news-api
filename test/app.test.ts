@@ -343,6 +343,17 @@ describe("app", () => {
     expect(typeof res.body.meta.requestId).toBe("string");
   });
 
+  it("GET /api/v1/articles/title rejects malformed path encoding", async () => {
+    const res = await request(app).get("/api/v1/articles/title/%E0%A4%A");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatchObject({
+      code: "invalid_path_parameter",
+      message: "Invalid URL-encoded path parameter",
+    });
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
   it("GET /api/articles/title returns 404 when missing", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const title = encodeURIComponent("Missing");

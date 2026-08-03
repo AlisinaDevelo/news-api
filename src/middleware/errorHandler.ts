@@ -16,6 +16,10 @@ function usesStructuredErrors(req: Request): boolean {
   return req.path.startsWith("/api/v1/");
 }
 
+function isMalformedPathError(err: unknown): err is URIError {
+  return err instanceof Error && err.name === "URIError";
+}
+
 export function errorHandler(
   err: unknown,
   req: Request,
@@ -41,6 +45,22 @@ export function errorHandler(
       return;
     }
     res.status(err.statusCode).json({ error: err.message });
+    return;
+  }
+  if (isMalformedPathError(err)) {
+    const message = "Invalid URL-encoded path parameter";
+    log.warn({ err, statusCode: 400 }, message);
+    if (usesStructuredErrors(req)) {
+      res.status(400).json({
+        error: {
+          code: "invalid_path_parameter",
+          message,
+          requestId: requestId(req),
+        },
+      });
+      return;
+    }
+    res.status(400).json({ error: message });
     return;
   }
   if (err instanceof Error) {
