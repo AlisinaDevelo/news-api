@@ -32,6 +32,11 @@ describe("parseArticleCount", () => {
     expect(() => parseArticleCount("-1")).toThrow(HttpError);
     expect(() => parseArticleCount("nope")).toThrow(HttpError);
   });
+
+  it("rejects malformed and fractional values", () => {
+    expect(() => parseArticleCount("2.5")).toThrow(HttpError);
+    expect(() => parseArticleCount("2abc")).toThrow(HttpError);
+  });
 });
 
 describe("parseArticlePage", () => {

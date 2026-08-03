@@ -13,8 +13,8 @@ export function parseArticleCount(raw: unknown): number {
   if (raw === undefined || raw === null || raw === "") {
     return DEFAULT_ARTICLE_COUNT;
   }
-  const n = parseInt(String(raw), 10);
-  if (!Number.isFinite(n) || n < 1) {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
     throw new HttpError(400, "count must be a positive integer", "invalid_count");
   }
   return Math.min(n, MAX_ARTICLE_COUNT);

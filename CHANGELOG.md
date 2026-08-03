@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker smoke coverage for the v1 response headers and fresh-cache `miss` to warm-cache `hit` transition.
 - Optional bounded pagination for article searches, forwarded to GNews and included in cache keys and v1 metadata.
 - Configurable capacity for the in-process cache via `CACHE_MAX_KEYS`; capacity write failures remain non-fatal to article requests.
+- Strict article-count validation so malformed and fractional values return `400` instead of being truncated.
 
 ### Changed
 
