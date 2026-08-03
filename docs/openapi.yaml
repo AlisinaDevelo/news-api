@@ -183,6 +183,7 @@ paths:
           required: true
           schema:
             type: string
+            maxLength: 256
       responses:
         "200":
           description: Enveloped matching article
@@ -193,6 +194,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ArticleEnvelope"
+        "400":
+          $ref: "#/components/responses/V1BadRequest"
         "401":
           $ref: "#/components/responses/V1Unauthorized"
         "404":
@@ -224,6 +227,7 @@ paths:
           required: true
           schema:
             type: string
+            maxLength: 256
         - $ref: "#/components/parameters/Count"
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/Lang"
@@ -273,6 +277,7 @@ paths:
           required: true
           schema:
             type: string
+            maxLength: 256
         - name: count
           in: query
           required: false
@@ -366,6 +371,7 @@ paths:
           required: true
           schema:
             type: string
+            maxLength: 256
       responses:
         "200":
           description: Matching article
@@ -373,6 +379,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Article"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -409,6 +417,7 @@ paths:
           required: true
           schema:
             type: string
+            maxLength: 256
         - name: count
           in: query
           required: false
@@ -505,6 +514,7 @@ components:
       required: true
       schema:
         type: string
+        maxLength: 256
     Count:
       name: count
       in: query

@@ -662,6 +662,7 @@ export interface operations {
                     "application/json": components["schemas"]["ArticleEnvelope"];
                 };
             };
+            400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
             /** @description No article with that title in the search window */
             404: {
@@ -815,6 +816,7 @@ export interface operations {
                     "application/json": components["schemas"]["Article"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             /** @description No article with that title in the search window */
             404: {

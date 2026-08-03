@@ -3,6 +3,7 @@ import {
   DEFAULT_ARTICLE_PAGE,
   MAX_ARTICLE_COUNT,
   MAX_ARTICLE_PAGE,
+  MAX_SEARCH_TEXT_LENGTH,
 } from "../constants";
 import { HttpError } from "../errors/HttpError";
 import { ArticleSearchFilters, ArticleSortBy } from "../types/search";
@@ -38,6 +39,13 @@ export function requireQueryString(value: unknown, fieldName: string): string {
       400,
       `Missing or empty query parameter: ${fieldName}`,
       "missing_query_parameter"
+    );
+  }
+  if (s.length > MAX_SEARCH_TEXT_LENGTH) {
+    throw new HttpError(
+      400,
+      `${fieldName} must be at most ${MAX_SEARCH_TEXT_LENGTH} characters`,
+      `invalid_${fieldName}_length`
     );
   }
   return s;

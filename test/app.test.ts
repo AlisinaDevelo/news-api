@@ -186,6 +186,10 @@ describe("app", () => {
       "/api/articles?query=tech&from=2026-01-02T00:00:00Z&to=2026-01-01T00:00:00Z"
     );
     expect(invalidRange.status).toBe(400);
+
+    const oversizedQuery = await request(app).get(`/api/articles?query=${"x".repeat(257)}`);
+    expect(oversizedQuery.status).toBe(400);
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it("reuses cache for identical search params", async () => {

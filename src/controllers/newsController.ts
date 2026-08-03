@@ -40,7 +40,7 @@ export const searchArticlesV1 = async (req: Request, res: Response): Promise<voi
 };
 
 export const getArticlesByTitle = async (req: Request, res: Response): Promise<void> => {
-  const title = decodeURIComponent(req.params.title);
+  const title = requireQueryString(decodeURIComponent(req.params.title), "title");
   const article = await fetchArticlesByTitle(title);
   if (article) {
     res.json(article);
@@ -50,7 +50,7 @@ export const getArticlesByTitle = async (req: Request, res: Response): Promise<v
 };
 
 export const getArticlesByTitleV1 = async (req: Request, res: Response): Promise<void> => {
-  const title = decodeURIComponent(req.params.title);
+  const title = requireQueryString(decodeURIComponent(req.params.title), "title");
   const article = await fetchArticlesByTitle(title);
   if (!article) {
     throw new HttpError(404, "Article not found", "article_not_found");

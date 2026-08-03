@@ -71,6 +71,10 @@ describe("requireQueryString", () => {
     expect(() => requireQueryString("   ", "query")).toThrow(HttpError);
     expect(() => requireQueryString(undefined, "query")).toThrow(HttpError);
   });
+
+  it("rejects oversized search text", () => {
+    expect(() => requireQueryString("x".repeat(257), "query")).toThrow(HttpError);
+  });
 });
 
 describe("parseArticleSearchFilters", () => {
