@@ -445,6 +445,37 @@ describe("app", () => {
     });
     expect(mockGet).toHaveBeenCalledTimes(3);
   });
+
+  it("allows only one recovery probe after the circuit cooldown", async () => {
+    vi.stubEnv("UPSTREAM_CIRCUIT_COOLDOWN_MS", "10");
+    mockGet.mockRejectedValue(new axios.AxiosError("timeout"));
+
+    const q = `circuit-recovery-${Math.random().toString(36).slice(2)}`;
+    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}-1&count=1`);
+    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}-2&count=1`);
+    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}-3&count=1`);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    mockGet.mockClear();
+    mockGet.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ data: { articles: sampleArticles } }), 25);
+        })
+    );
+
+    try {
+      const [first, second] = await Promise.all([
+        request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}-4&count=1`),
+        request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}-5&count=1`),
+      ]);
+
+      expect([first.status, second.status].sort()).toEqual([200, 503]);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("bounded memory cache", () => {

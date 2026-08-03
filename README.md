@@ -8,7 +8,7 @@ A search runs through a small, explicit pipeline — each stage is a separate, t
 
 1. **Validate** — query params are checked before any network call: `query`, source, and title text are required and capped at 256 characters, `count` and `page` must be positive integers and are bounded (≤100), `lang`/`country` must be ISO two-letter codes, `from`/`to` must parse as ISO 8601, and `sortBy` ∈ {`publishedAt`, `relevance`}. Bad input fails fast with `400` instead of wasting an upstream call or quota.
 2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set). Cache failures are logged/metriced but do not fail article requests; identical in-flight misses in the same process share one upstream call.
-3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502`, and repeated failures open a short circuit that returns `503` without amplifying the outage.
+3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502`, and repeated failures open a short circuit that returns `503` without amplifying the outage. Recovery admits one half-open probe at a time.
 4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss/stale fallback, upstream outcome, latency histogram), and optional OpenTelemetry spans.
 5. **Respond** — legacy endpoints return raw article arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with request/cache metadata, `X-API-Version`, cache-status headers for searches, and structured error bodies.
 

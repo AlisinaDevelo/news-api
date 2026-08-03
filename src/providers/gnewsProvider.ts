@@ -16,11 +16,13 @@ export interface NewsProvider {
 interface CircuitState {
   failures: number;
   openedAt: number | undefined;
+  halfOpenInFlight: boolean;
 }
 
 const circuit: CircuitState = {
   failures: 0,
   openedAt: undefined,
+  halfOpenInFlight: false,
 };
 
 function failureThreshold(): number {
@@ -34,6 +36,15 @@ function cooldownMs(): number {
 }
 
 function assertCircuitAllowsRequest(now = Date.now()): void {
+  if (circuit.openedAt === undefined && circuit.halfOpenInFlight) {
+    upstreamCircuitEventsTotal.inc({ event: "short_circuit" });
+    throw new HttpError(
+      503,
+      "Upstream news service temporarily unavailable",
+      "upstream_circuit_open"
+    );
+  }
+
   if (circuit.openedAt === undefined) {
     return;
   }
@@ -48,18 +59,21 @@ function assertCircuitAllowsRequest(now = Date.now()): void {
   }
 
   circuit.openedAt = undefined;
+  circuit.halfOpenInFlight = true;
   upstreamCircuitEventsTotal.inc({ event: "half_open" });
 }
 
 function recordProviderSuccess(): void {
-  if (circuit.failures > 0 || circuit.openedAt !== undefined) {
+  if (circuit.failures > 0 || circuit.openedAt !== undefined || circuit.halfOpenInFlight) {
     upstreamCircuitEventsTotal.inc({ event: "closed" });
   }
   circuit.failures = 0;
   circuit.openedAt = undefined;
+  circuit.halfOpenInFlight = false;
 }
 
 function recordProviderFailure(): void {
+  circuit.halfOpenInFlight = false;
   circuit.failures += 1;
   if (circuit.failures >= failureThreshold() && circuit.openedAt === undefined) {
     circuit.openedAt = Date.now();
@@ -71,6 +85,7 @@ function recordProviderFailure(): void {
 export function resetGNewsCircuitForTests(): void {
   circuit.failures = 0;
   circuit.openedAt = undefined;
+  circuit.halfOpenInFlight = false;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -94,7 +94,7 @@ Successful upstream searches write both a fresh cache key and a longer-lived sta
 
 ## Provider Circuit Breaker
 
-The GNews provider adapter tracks consecutive provider failures. After `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` failures, it opens a cooldown window (`UPSTREAM_CIRCUIT_COOLDOWN_MS`) and returns `503` without making another upstream call. After the cooldown, one request is allowed through; success closes the circuit, while another failure opens it again.
+The GNews provider adapter tracks consecutive provider failures. After `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` failures, it opens a cooldown window (`UPSTREAM_CIRCUIT_COOLDOWN_MS`) and returns `503` without making another upstream call. After the cooldown, exactly one request is allowed through as the half-open recovery probe; concurrent callers remain short-circuited until that probe succeeds or fails. Success closes the circuit, while another failure opens it again.
 
 ## Metrics
 
