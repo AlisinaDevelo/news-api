@@ -12,7 +12,7 @@
 | `HTTP_TIMEOUT_MS` | `15000` | Outbound GNews request timeout (max `60000`). |
 | `STALE_CACHE_TTL_SEC` | `3600` | Longer-lived stale article cache TTL used only as an upstream-failure fallback (min effective value `>600`, max `86400`). |
 | `CACHE_MAX_KEYS` | `2000` | Maximum number of keys held by the in-process cache. Fresh and stale entries both count; when full, the least-recently-used entry is evicted. Values above `100000` are clamped. Ignored when `REDIS_URL` is set. |
-| `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Consecutive provider failures before the circuit opens. |
+| `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Positive integer number of consecutive provider failures before the circuit opens; invalid values fall back to `3`. |
 | `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). Only one recovery probe is allowed after cooldown. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
 | `RATE_LIMIT_MAX` | `120` | Max requests per IP per window. |

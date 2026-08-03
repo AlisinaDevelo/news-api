@@ -27,7 +27,7 @@ const circuit: CircuitState = {
 
 function failureThreshold(): number {
   const raw = Number(process.env.UPSTREAM_CIRCUIT_FAILURE_THRESHOLD ?? 3);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 3;
+  return Number.isInteger(raw) && raw > 0 ? raw : 3;
 }
 
 function cooldownMs(): number {

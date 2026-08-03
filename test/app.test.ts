@@ -476,6 +476,29 @@ describe("app", () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it("falls back to the default circuit threshold for fractional configuration", async () => {
+    vi.stubEnv("UPSTREAM_CIRCUIT_FAILURE_THRESHOLD", "0.5");
+    mockGet
+      .mockRejectedValueOnce(new axios.AxiosError("timeout"))
+      .mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    try {
+      const q = `circuit-config-${Math.random().toString(36).slice(2)}`;
+      const first = await request(app).get(
+        `/api/v1/articles?query=${encodeURIComponent(q)}-1&count=1`
+      );
+      const second = await request(app).get(
+        `/api/v1/articles?query=${encodeURIComponent(q)}-2&count=1`
+      );
+
+      expect(first.status).toBe(502);
+      expect(second.status).toBe(200);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("bounded memory cache", () => {
