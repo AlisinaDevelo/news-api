@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strict article-count validation so malformed and fractional values return `400` instead of being truncated.
 - Bounded query, source, and title text inputs at 256 characters before provider or cache work.
 - Malformed percent-encoded title paths now return structured `400` errors instead of generic `500` responses.
+- In-process cache capacity now uses least-recently-used eviction and exposes an eviction counter instead of rejecting new keys at capacity.
 
 ### Changed
 

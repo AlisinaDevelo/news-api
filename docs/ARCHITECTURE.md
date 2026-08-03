@@ -86,9 +86,9 @@ Unhandled promise rejections in async route handlers are forwarded by `asyncHand
 
 ## Caching
 
-Article arrays are stored per normalized search key with a **600-second** TTL (`src/cache/store.ts`). Without `REDIS_URL`, `node-cache` is used with a configurable `CACHE_MAX_KEYS` bound (default `2000`); with `REDIS_URL`, **ioredis** stores JSON payloads for shared caches across replicas.
+Article arrays are stored per normalized search key with a **600-second** TTL (`src/cache/store.ts`). Without `REDIS_URL`, `node-cache` is used with a configurable `CACHE_MAX_KEYS` bound and least-recently-used eviction (default `2000`); with `REDIS_URL`, **ioredis** stores JSON payloads for shared caches across replicas.
 
-The service treats the cache as a quota and latency optimization, not as a hard dependency. Read failures fall through to the upstream provider, write failures (including in-memory capacity exhaustion) return the upstream response without caching it, and both paths emit warning logs plus cache error metrics. Within a single process, concurrent misses for the same normalized key are coalesced so only the first request calls the provider.
+The service treats the cache as a quota and latency optimization, not as a hard dependency. Read failures fall through to the upstream provider, write failures return the upstream response without caching it, and both paths emit warning logs plus cache error metrics. In-memory capacity is handled by evicting the least-recently-used entry, with eviction counts exposed as a metric. Within a single process, concurrent misses for the same normalized key are coalesced so only the first request calls the provider.
 
 Successful upstream searches write both a fresh cache key and a longer-lived stale key. The fresh key protects latency and quota under normal conditions; the stale key is only read after an upstream failure. Versioned responses expose this through `meta.cache=stale` and `X-Cache-Status: stale`.
 

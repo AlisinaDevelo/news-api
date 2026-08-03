@@ -1,6 +1,7 @@
 import NodeCache from "node-cache";
 import Redis from "ioredis";
 import { logger } from "../logger";
+import { cacheEvictionsTotal } from "../metrics/register";
 
 const TTL_SEC = 600;
 const DEFAULT_MAX_KEYS = 2_000;
@@ -25,12 +26,58 @@ function resolveMemoryCacheMaxKeys(): number {
 function createMemoryStore(): CacheStore {
   const maxKeys = resolveMemoryCacheMaxKeys();
   const c = new NodeCache({ stdTTL: TTL_SEC, maxKeys });
+  const recency = new Map<string, true>();
+
+  const touch = (key: string): void => {
+    recency.delete(key);
+    recency.set(key, true);
+  };
+
+  const evictLeastRecentlyUsed = (): boolean => {
+    const oldest = recency.keys().next().value;
+    if (typeof oldest === "string") {
+      recency.delete(oldest);
+      c.del(oldest);
+      cacheEvictionsTotal.inc();
+      return true;
+    }
+
+    const fallback = c.keys()[0];
+    if (!fallback) {
+      return false;
+    }
+    c.del(fallback);
+    cacheEvictionsTotal.inc();
+    return true;
+  };
+
+  const makeRoom = (key: string): void => {
+    if (c.has(key)) {
+      c.del(key);
+      recency.delete(key);
+    } else {
+      recency.delete(key);
+    }
+
+    while (c.getStats().keys >= maxKeys && evictLeastRecentlyUsed()) {
+      // Keep removing the oldest entry until NodeCache accepts the new key.
+    }
+  };
+
   return {
     async get(key: string) {
-      return c.get(key);
+      const value = c.get(key);
+      if (value === undefined) {
+        recency.delete(key);
+      } else {
+        touch(key);
+      }
+      return value;
     },
     async set(key: string, value: unknown, ttlSec = TTL_SEC) {
+      makeRoom(key);
       c.set(key, value, ttlSec);
+      touch(key);
     },
   };
 }

@@ -11,7 +11,7 @@
 | `GNEWS_BASE_URL` | `https://gnews.io/api/v4` | Upstream provider base URL. Override only for local integration tests, benchmarks, or compatible provider mocks. |
 | `HTTP_TIMEOUT_MS` | `15000` | Outbound GNews request timeout (max `60000`). |
 | `STALE_CACHE_TTL_SEC` | `3600` | Longer-lived stale article cache TTL used only as an upstream-failure fallback (min effective value `>600`, max `86400`). |
-| `CACHE_MAX_KEYS` | `2000` | Maximum number of keys held by the in-process cache. Fresh and stale entries both count; writes after capacity are tolerated as uncached responses. Values above `100000` are clamped. Ignored when `REDIS_URL` is set. |
+| `CACHE_MAX_KEYS` | `2000` | Maximum number of keys held by the in-process cache. Fresh and stale entries both count; when full, the least-recently-used entry is evicted. Values above `100000` are clamped. Ignored when `REDIS_URL` is set. |
 | `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Consecutive provider failures before the circuit opens. |
 | `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
@@ -37,7 +37,7 @@
 
 ## Scaling and cache
 
-- **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL, bounded to `CACHE_MAX_KEYS` entries). Each replica has its own entries. Fresh and stale keys share this capacity; when it is full, cache writes fail safely and requests continue uncached until expired entries make room.
+- **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL, bounded to `CACHE_MAX_KEYS` entries with least-recently-used eviction). Each replica has its own entries. Fresh and stale keys share this capacity; expired entries are removed on access and new writes evict the oldest live entry when needed.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
 - Cache keys include normalized search parameters: query, count, page, `lang`, `country`, `from`, `to`, and `sortBy`.
 - Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, the service logs a warning, increments cache error metrics, falls through to GNews on read failure, and still returns the upstream response on write failure.
@@ -55,6 +55,7 @@ On shutdown the server closes the Redis connection when that backend was used.
 | `http_requests_total` | `method`, `status_code` | HTTP response count. |
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, or skipping stale fallback. |
+| `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
 | `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload` | GNews provider request latency histogram. |
 | `news_upstream_circuit_events_total` | `event=opened|short_circuit|half_open|closed` | Provider circuit breaker state transitions and short-circuited requests. |

@@ -449,7 +449,7 @@ describe("app", () => {
 
 describe("bounded memory cache", () => {
   beforeEach(() => {
-    vi.stubEnv("CACHE_MAX_KEYS", "1");
+    vi.stubEnv("CACHE_MAX_KEYS", "2");
     resetCacheStoreForTests();
   });
 
@@ -458,11 +458,21 @@ describe("bounded memory cache", () => {
     resetCacheStoreForTests();
   });
 
-  it("rejects writes after the configured key capacity is reached", async () => {
+  it("evicts the least recently used key at capacity", async () => {
     const store = getCacheStore();
 
     await store.set("first", sampleArticles);
-    await expect(store.set("second", sampleArticles)).rejects.toThrow();
+    await store.set("second", sampleArticles);
+    expect(await store.get("first")).toEqual(sampleArticles);
+
+    await store.set("third", sampleArticles);
+
+    expect(await store.get("first")).toEqual(sampleArticles);
+    expect(await store.get("second")).toBeUndefined();
+    expect(await store.get("third")).toEqual(sampleArticles);
+
+    const metrics = await request(app).get("/metrics");
+    expect(metrics.text).toContain("news_cache_evictions_total");
   });
 });
 

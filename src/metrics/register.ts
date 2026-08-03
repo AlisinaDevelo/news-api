@@ -25,6 +25,12 @@ export const cacheErrorsTotal = new Counter({
   registers: [register],
 });
 
+export const cacheEvictionsTotal = new Counter({
+  name: "news_cache_evictions_total",
+  help: "Total least-recently-used evictions from the in-process cache",
+  registers: [register],
+});
+
 export const upstreamRequestsTotal = new Counter({
   name: "news_upstream_requests_total",
   help: "Total upstream news provider requests by outcome",
