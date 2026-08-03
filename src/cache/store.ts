@@ -3,6 +3,8 @@ import Redis from "ioredis";
 import { logger } from "../logger";
 
 const TTL_SEC = 600;
+const DEFAULT_MAX_KEYS = 2_000;
+const ABSOLUTE_MAX_KEYS = 100_000;
 
 export type CacheStore = {
   get(key: string): Promise<unknown | undefined>;
@@ -12,8 +14,17 @@ export type CacheStore = {
 let singleton: CacheStore | null = null;
 let redisClient: Redis | null = null;
 
+function resolveMemoryCacheMaxKeys(): number {
+  const configured = Number(process.env.CACHE_MAX_KEYS);
+  if (!Number.isInteger(configured) || configured < 1) {
+    return DEFAULT_MAX_KEYS;
+  }
+  return Math.min(configured, ABSOLUTE_MAX_KEYS);
+}
+
 function createMemoryStore(): CacheStore {
-  const c = new NodeCache({ stdTTL: TTL_SEC });
+  const maxKeys = resolveMemoryCacheMaxKeys();
+  const c = new NodeCache({ stdTTL: TTL_SEC, maxKeys });
   return {
     async get(key: string) {
       return c.get(key);
@@ -58,6 +69,8 @@ export function getCacheStore(): CacheStore {
     singleton = url ? createRedisStore(url) : createMemoryStore();
     if (url) {
       logger.info("using redis cache backend");
+    } else {
+      logger.info({ maxKeys: resolveMemoryCacheMaxKeys() }, "using memory cache backend");
     }
   }
   return singleton;

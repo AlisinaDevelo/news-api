@@ -19,7 +19,11 @@ vi.mock("axios", async (importOriginal) => {
 import axios from "axios";
 import app from "../src/app";
 import { sampleArticles } from "./fixtures/articles";
-import { resetCacheStoreForTests, setCacheStoreForTests } from "../src/cache/store";
+import {
+  getCacheStore,
+  resetCacheStoreForTests,
+  setCacheStoreForTests,
+} from "../src/cache/store";
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
 
 describe("app", () => {
@@ -425,6 +429,25 @@ describe("app", () => {
       message: "Upstream news service temporarily unavailable",
     });
     expect(mockGet).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("bounded memory cache", () => {
+  beforeEach(() => {
+    vi.stubEnv("CACHE_MAX_KEYS", "1");
+    resetCacheStoreForTests();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetCacheStoreForTests();
+  });
+
+  it("rejects writes after the configured key capacity is reached", async () => {
+    const store = getCacheStore();
+
+    await store.set("first", sampleArticles);
+    await expect(store.set("second", sampleArticles)).rejects.toThrow();
   });
 });
 
