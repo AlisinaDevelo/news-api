@@ -114,6 +114,26 @@ describe("app", () => {
     );
   });
 
+  it("retries a transient upstream failure once", async () => {
+    vi.stubEnv("UPSTREAM_RETRY_ATTEMPTS", "1");
+    vi.stubEnv("UPSTREAM_RETRY_BASE_DELAY_MS", "1");
+    mockGet
+      .mockRejectedValueOnce(new axios.AxiosError("connection reset", "ECONNRESET"))
+      .mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    try {
+      const res = await request(app).get("/api/articles?query=retry&count=2");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(sampleArticles);
+      expect(mockGet).toHaveBeenCalledTimes(2);
+      const metrics = await request(app).get("/metrics");
+      expect(metrics.text).toContain("news_upstream_retries_total");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("GET /api/v1/articles returns an enveloped search response", async () => {
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
     const res = await request(app).get("/api/v1/articles?query=tech&count=2&page=2&lang=EN");

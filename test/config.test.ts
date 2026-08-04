@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolvePositiveIntegerEnv } from "../src/config/numbers";
+import {
+  resolveNonNegativeIntegerEnv,
+  resolvePositiveIntegerEnv,
+} from "../src/config/numbers";
 
 describe("resolvePositiveIntegerEnv", () => {
   it("uses the fallback for missing, malformed, or non-positive values", () => {
@@ -19,5 +22,11 @@ describe("resolvePositiveIntegerEnv", () => {
   it("clamps values when a maximum is configured", () => {
     expect(resolvePositiveIntegerEnv("101", 15, 100)).toBe(100);
     expect(resolvePositiveIntegerEnv("25", 15, 100)).toBe(25);
+  });
+
+  it("allows zero for optional retry counts", () => {
+    expect(resolveNonNegativeIntegerEnv("", 1, 3)).toBe(1);
+    expect(resolveNonNegativeIntegerEnv("0", 1, 3)).toBe(0);
+    expect(resolveNonNegativeIntegerEnv("4", 1, 3)).toBe(3);
   });
 });

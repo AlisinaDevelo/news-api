@@ -10,6 +10,8 @@
 | `LOG_LEVEL` | `info` (non-test) | Pino level (`trace`–`fatal`, or `silent`). |
 | `GNEWS_BASE_URL` | `https://gnews.io/api/v4` | Upstream provider base URL. Override only for local integration tests, benchmarks, or compatible provider mocks. |
 | `HTTP_TIMEOUT_MS` | `15000` | Outbound GNews request timeout (max `60000`). |
+| `UPSTREAM_RETRY_ATTEMPTS` | `1` | Extra attempts for transient network/timeout and 5xx failures (maximum `3`; set `0` to disable). |
+| `UPSTREAM_RETRY_BASE_DELAY_MS` | `100` | Initial exponential retry delay with jitter (maximum `2000`). |
 | `STALE_CACHE_TTL_SEC` | `3600` | Longer-lived stale article cache TTL used only as an upstream-failure fallback (min effective value `>600`, max `86400`). |
 | `CACHE_MAX_KEYS` | `2000` | Maximum number of keys held by the in-process cache. Fresh and stale entries both count; when full, the least-recently-used entry is evicted. Values above `100000` are clamped. Ignored when `REDIS_URL` is set. |
 | `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Positive integer number of consecutive provider failures before the circuit opens; invalid values fall back to `3`. |
@@ -26,9 +28,9 @@
 | `OTEL_SERVICE_NAME` | `news-api` | `service.name` resource attribute. |
 | `OTEL_TRACING_ENABLED` | `0` | Set to `1` to export traces to default `http://127.0.0.1:4318/v1/traces` when no OTLP endpoint env is set (local dev). |
 
-Runtime numeric settings are parsed as positive safe integers. Fractional, non-finite,
-zero, negative, or malformed values use their documented defaults; settings with documented
-maximums are clamped.
+Runtime numeric settings are parsed as safe integers. Fractional, non-finite, negative, or
+malformed values use their documented defaults; optional retry counts may be `0`, and settings
+with documented maximums are clamped.
 
 ## Probes
 
@@ -47,6 +49,7 @@ maximums are clamped.
 - Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, contains malformed Redis JSON, or contains a value that is not a valid article array, the service logs a warning, increments cache error metrics, falls through to GNews on read failure, and still returns the upstream response on write failure.
 - Provider payloads with more than `100` articles are rejected as invalid so an upstream response cannot bypass the API's bounded collection contract.
 - The GNews client rejects response bodies larger than `5 MiB` before the payload reaches application validation.
+- Transient network/timeout and 5xx provider failures are retried with bounded exponential backoff and jitter. `429` and other 4xx responses, invalid payloads, and internal errors are not retried.
 - Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
 - Successful searches are also written to a longer-lived stale cache key. If a later fresh miss hits an upstream failure and stale data is available, `/api/v1/*` returns `meta.cache=stale` and `X-Cache-Status: stale` with a `200` response instead of surfacing the provider outage.
 
@@ -63,6 +66,7 @@ On shutdown the server closes the Redis connection when that backend was used.
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, or skipping stale fallback. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
+| `news_upstream_retries_total` | — | Transient upstream retry attempts. |
 | `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload` | GNews provider request latency histogram. |
 | `news_upstream_circuit_events_total` | `event=opened|short_circuit|half_open|closed` | Provider circuit breaker state transitions and short-circuited requests. |
 

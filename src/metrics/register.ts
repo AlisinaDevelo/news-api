@@ -38,6 +38,12 @@ export const upstreamRequestsTotal = new Counter({
   registers: [register],
 });
 
+export const upstreamRetriesTotal = new Counter({
+  name: "news_upstream_retries_total",
+  help: "Total transient retry attempts for upstream news provider requests",
+  registers: [register],
+});
+
 export const upstreamRequestDurationSeconds = new Histogram({
   name: "news_upstream_request_duration_seconds",
   help: "Duration of upstream news provider requests in seconds",

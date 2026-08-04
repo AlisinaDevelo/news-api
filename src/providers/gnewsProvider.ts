@@ -10,6 +10,7 @@ import {
 } from "../metrics/register";
 import { isArticleList, type Article } from "../types/article";
 import { ArticleSearchOptions } from "../types/search";
+import { withUpstreamRetries } from "./retry";
 
 export interface NewsProvider {
   search(options: ArticleSearchOptions): Promise<Article[]>;
@@ -125,12 +126,14 @@ export class GNewsProvider implements NewsProvider {
     const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
 
     try {
-      const response = await axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
-        params: toProviderParams(options),
-        timeout: UPSTREAM_TIMEOUT_MS,
-        maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
-        validateStatus: (s) => s >= 200 && s < 300,
-      });
+      const response = await withUpstreamRetries(() =>
+        axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
+          params: toProviderParams(options),
+          timeout: UPSTREAM_TIMEOUT_MS,
+          maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
+          validateStatus: (s) => s >= 200 && s < 300,
+        })
+      );
 
       const articles = normalizeArticles(response.data);
       upstreamRequestsTotal.inc({ outcome: "success" });

@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runtime numeric settings now share strict positive-integer parsing, with documented caps and defaults applied consistently.
 - Provider article collections above the API maximum are rejected before they can be cached or returned.
 - Upstream Axios responses are capped at `5 MiB` before payload validation and caching.
+- Transient upstream network and 5xx failures receive one bounded retry by default; malformed payloads and non-transient client errors are not retried.
 
 ### Changed
 
