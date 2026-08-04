@@ -1,6 +1,7 @@
 import axios from "axios";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
+import { MAX_ARTICLE_COUNT } from "../constants";
 import { HttpError } from "../errors/HttpError";
 import {
   upstreamCircuitEventsTotal,
@@ -98,7 +99,7 @@ function normalizeArticles(data: unknown): Article[] {
   }
 
   const articles = (data as { articles: unknown }).articles;
-  if (!isArticleList(articles)) {
+  if (!isArticleList(articles) || articles.length > MAX_ARTICLE_COUNT) {
     throw new HttpError(502, "Invalid response from news provider", "invalid_provider_payload");
   }
   return articles;

@@ -25,6 +25,7 @@ import {
   setCacheStoreForTests,
 } from "../src/cache/store";
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
+import { MAX_ARTICLE_COUNT } from "../src/constants";
 
 describe("app", () => {
   beforeEach(() => {
@@ -449,6 +450,19 @@ describe("app", () => {
       data: { articles: [{ ...sampleArticles[0], source: { name: "BBC" } }] },
     });
     const res = await request(app).get("/api/articles?query=badarticle&count=1");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("Invalid response from news provider");
+  });
+
+  it("returns 502 when provider returns more articles than the API allows", async () => {
+    const oversizedArticles = Array.from({ length: MAX_ARTICLE_COUNT + 1 }, (_, index) => ({
+      ...sampleArticles[0],
+      title: `Oversized article ${index}`,
+    }));
+    mockGet.mockResolvedValueOnce({ data: { articles: oversizedArticles } });
+
+    const res = await request(app).get("/api/articles?query=oversized&count=100");
+
     expect(res.status).toBe(502);
     expect(res.body.error).toBe("Invalid response from news provider");
   });

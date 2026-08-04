@@ -45,6 +45,7 @@ maximums are clamped.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
 - Cache keys include normalized search parameters: query, count, page, `lang`, `country`, `from`, `to`, and `sortBy`.
 - Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, contains malformed Redis JSON, or contains a value that is not a valid article array, the service logs a warning, increments cache error metrics, falls through to GNews on read failure, and still returns the upstream response on write failure.
+- Provider payloads with more than `100` articles are rejected as invalid so an upstream response cannot bypass the API's bounded collection contract.
 - Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
 - Successful searches are also written to a longer-lived stale cache key. If a later fresh miss hits an upstream failure and stale data is available, `/api/v1/*` returns `meta.cache=stale` and `X-Cache-Status: stale` with a `200` response instead of surfacing the provider outage.
 
