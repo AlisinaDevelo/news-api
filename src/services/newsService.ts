@@ -1,4 +1,4 @@
-import { Article } from "../types/article";
+import { isArticleList, type Article } from "../types/article";
 import { CacheStore, getCacheStore } from "../cache/store";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 import { cacheErrorsTotal, cacheEventsTotal } from "../metrics/register";
@@ -44,8 +44,11 @@ async function readCachedArticles(
   try {
     const cached = await store.get(cacheKey);
     if (cached !== undefined) {
+      if (!isArticleList(cached)) {
+        throw new Error("invalid cached article payload");
+      }
       cacheEventsTotal.inc({ result: "hit" });
-      return { articles: cached as Article[], cache: "hit" };
+      return { articles: cached, cache: "hit" };
     }
   } catch (err) {
     cacheEventsTotal.inc({ result: "error" });
@@ -65,8 +68,11 @@ async function readStaleCachedArticles(
   try {
     const cached = await store.get(staleCacheKey(cacheKey));
     if (cached !== undefined) {
+      if (!isArticleList(cached)) {
+        throw new Error("invalid stale cached article payload");
+      }
       cacheEventsTotal.inc({ result: "stale" });
-      return { articles: cached as Article[], cache: "stale" };
+      return { articles: cached, cache: "stale" };
     }
   } catch (err) {
     cacheErrorsTotal.inc({ operation: "get_stale" });

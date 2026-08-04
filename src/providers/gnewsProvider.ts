@@ -6,7 +6,7 @@ import {
   upstreamRequestDurationSeconds,
   upstreamRequestsTotal,
 } from "../metrics/register";
-import type { Article, ArticleSource } from "../types/article";
+import { isArticleList, type Article } from "../types/article";
 import { ArticleSearchOptions } from "../types/search";
 
 export interface NewsProvider {
@@ -88,35 +88,6 @@ export function resetGNewsCircuitForTests(): void {
   circuit.halfOpenInFlight = false;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object";
-}
-
-function isStringOrNull(value: unknown): value is string | null {
-  return value === null || typeof value === "string";
-}
-
-function isArticleSource(value: unknown): value is ArticleSource {
-  return (
-    isRecord(value) &&
-    typeof value.name === "string" &&
-    typeof value.url === "string"
-  );
-}
-
-function isArticle(value: unknown): value is Article {
-  return (
-    isRecord(value) &&
-    typeof value.title === "string" &&
-    isStringOrNull(value.description) &&
-    isStringOrNull(value.content) &&
-    typeof value.url === "string" &&
-    isStringOrNull(value.image) &&
-    typeof value.publishedAt === "string" &&
-    isArticleSource(value.source)
-  );
-}
-
 function normalizeArticles(data: unknown): Article[] {
   if (
     data === null ||
@@ -127,8 +98,8 @@ function normalizeArticles(data: unknown): Article[] {
     throw new HttpError(502, "Invalid response from news provider", "invalid_provider_payload");
   }
 
-  const articles = (data as { articles: unknown[] }).articles;
-  if (!articles.every(isArticle)) {
+  const articles = (data as { articles: unknown }).articles;
+  if (!isArticleList(articles)) {
     throw new HttpError(502, "Invalid response from news provider", "invalid_provider_payload");
   }
   return articles;

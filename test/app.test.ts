@@ -257,6 +257,25 @@ describe("app", () => {
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
+  it("falls through when the cache payload has an invalid article shape", async () => {
+    setCacheStoreForTests({
+      async get() {
+        return { invalid: true };
+      },
+      async set() {
+        return undefined;
+      },
+    });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    const q = `cache-invalid-payload-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(sampleArticles);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
   it("returns upstream response when cache set fails", async () => {
     setCacheStoreForTests({
       async get() {
@@ -297,6 +316,24 @@ describe("app", () => {
     expect(res.headers["x-api-version"]).toBe("v1");
     expect(res.headers["x-cache-status"]).toBe("stale");
     expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not serve a structurally invalid stale cache payload", async () => {
+    setCacheStoreForTests({
+      async get(key) {
+        return key.endsWith(":stale") ? { invalid: true } : undefined;
+      },
+      async set() {
+        return undefined;
+      },
+    });
+    mockGet.mockRejectedValueOnce(new axios.AxiosError("timeout"));
+
+    const q = `stale-invalid-payload-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatchObject({ code: "upstream_unavailable" });
   });
 
   it("coalesces identical in-flight cache misses", async () => {
