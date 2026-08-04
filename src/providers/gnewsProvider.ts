@@ -1,4 +1,5 @@
 import axios from "axios";
+import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
 import { HttpError } from "../errors/HttpError";
 import {
@@ -26,13 +27,11 @@ const circuit: CircuitState = {
 };
 
 function failureThreshold(): number {
-  const raw = Number(process.env.UPSTREAM_CIRCUIT_FAILURE_THRESHOLD ?? 3);
-  return Number.isInteger(raw) && raw > 0 ? raw : 3;
+  return resolvePositiveIntegerEnv(process.env.UPSTREAM_CIRCUIT_FAILURE_THRESHOLD, 3);
 }
 
 function cooldownMs(): number {
-  const raw = Number(process.env.UPSTREAM_CIRCUIT_COOLDOWN_MS ?? 30_000);
-  return Number.isFinite(raw) && raw > 0 ? Math.min(raw, 300_000) : 30_000;
+  return resolvePositiveIntegerEnv(process.env.UPSTREAM_CIRCUIT_COOLDOWN_MS, 30_000, 300_000);
 }
 
 function assertCircuitAllowsRequest(now = Date.now()): void {

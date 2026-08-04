@@ -1,5 +1,6 @@
 import { isArticleList, type Article } from "../types/article";
 import { CacheStore, getCacheStore } from "../cache/store";
+import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 import { cacheErrorsTotal, cacheEventsTotal } from "../metrics/register";
 import { logger } from "../logger";
@@ -33,8 +34,8 @@ function staleCacheKey(cacheKey: string): string {
 }
 
 function resolveStaleCacheTtlSec(): number {
-  const raw = Number(process.env.STALE_CACHE_TTL_SEC ?? 3_600);
-  return Number.isFinite(raw) && raw > 600 ? Math.min(Math.floor(raw), 86_400) : 3_600;
+  const configured = resolvePositiveIntegerEnv(process.env.STALE_CACHE_TTL_SEC, 3_600, 86_400);
+  return configured > 600 ? configured : 3_600;
 }
 
 async function readCachedArticles(

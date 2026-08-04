@@ -1,8 +1,9 @@
 import rateLimit from "express-rate-limit";
 import type { Request } from "express";
+import { resolvePositiveIntegerEnv } from "../config/numbers";
 
-const windowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000);
-const max = Number(process.env.RATE_LIMIT_MAX ?? 120);
+const windowMs = resolvePositiveIntegerEnv(process.env.RATE_LIMIT_WINDOW_MS, 60_000);
+const max = resolvePositiveIntegerEnv(process.env.RATE_LIMIT_MAX, 120);
 
 function skipRateLimit(req: Request): boolean {
   if (
@@ -22,8 +23,8 @@ function skipRateLimit(req: Request): boolean {
 }
 
 export const apiRateLimiter = rateLimit({
-  windowMs: Number.isFinite(windowMs) && windowMs > 0 ? windowMs : 60_000,
-  max: Number.isFinite(max) && max > 0 ? max : 120,
+  windowMs,
+  max,
   standardHeaders: true,
   legacyHeaders: false,
   skip: skipRateLimit,

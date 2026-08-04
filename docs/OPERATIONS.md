@@ -26,6 +26,10 @@
 | `OTEL_SERVICE_NAME` | `news-api` | `service.name` resource attribute. |
 | `OTEL_TRACING_ENABLED` | `0` | Set to `1` to export traces to default `http://127.0.0.1:4318/v1/traces` when no OTLP endpoint env is set (local dev). |
 
+Runtime numeric settings are parsed as positive safe integers. Fractional, non-finite,
+zero, negative, or malformed values use their documented defaults; settings with documented
+maximums are clamped.
+
 ## Probes
 
 - **Liveness:** `GET /health` — process is up.

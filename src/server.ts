@@ -3,15 +3,14 @@ import "./otel-bootstrap";
 import app from "./app";
 import { disconnectCacheStore } from "./cache/store";
 import { requireApiKeyUnlessTest } from "./config/env";
+import { resolvePositiveIntegerEnv } from "./config/numbers";
 import { logger } from "./logger";
 import { shutdownTracing } from "./tracing";
 
 requireApiKeyUnlessTest();
 
-const PORT = Number(process.env.PORT) || 3000;
-const shutdownMs = Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 10_000);
-const shutdownTimeoutMs =
-  Number.isFinite(shutdownMs) && shutdownMs > 0 ? shutdownMs : 10_000;
+const PORT = resolvePositiveIntegerEnv(process.env.PORT, 3000, 65_535);
+const shutdownTimeoutMs = resolvePositiveIntegerEnv(process.env.SHUTDOWN_TIMEOUT_MS, 10_000);
 
 const server = app.listen(PORT, () => {
   logger.info({ port: PORT }, "server listening");

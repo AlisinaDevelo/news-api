@@ -1,5 +1,6 @@
 import NodeCache from "node-cache";
 import Redis from "ioredis";
+import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { logger } from "../logger";
 import { cacheEvictionsTotal } from "../metrics/register";
 
@@ -16,11 +17,7 @@ let singleton: CacheStore | null = null;
 let redisClient: Redis | null = null;
 
 function resolveMemoryCacheMaxKeys(): number {
-  const configured = Number(process.env.CACHE_MAX_KEYS);
-  if (!Number.isInteger(configured) || configured < 1) {
-    return DEFAULT_MAX_KEYS;
-  }
-  return Math.min(configured, ABSOLUTE_MAX_KEYS);
+  return resolvePositiveIntegerEnv(process.env.CACHE_MAX_KEYS, DEFAULT_MAX_KEYS, ABSOLUTE_MAX_KEYS);
 }
 
 function createMemoryStore(): CacheStore {

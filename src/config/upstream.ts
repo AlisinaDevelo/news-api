@@ -1,7 +1,10 @@
-const raw = Number(process.env.HTTP_TIMEOUT_MS ?? 15_000);
+import { resolvePositiveIntegerEnv } from "./numbers";
 
-export const UPSTREAM_TIMEOUT_MS =
-  Number.isFinite(raw) && raw > 0 ? Math.min(raw, 60_000) : 15_000;
+export const UPSTREAM_TIMEOUT_MS = resolvePositiveIntegerEnv(
+  process.env.HTTP_TIMEOUT_MS,
+  15_000,
+  60_000
+);
 
 const DEFAULT_UPSTREAM_BASE_URL = "https://gnews.io/api/v4";
 

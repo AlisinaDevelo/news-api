@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Circuit recovery now admits one half-open provider probe at a time, preventing concurrent callers from stampeding a recovering upstream.
 - Invalid fractional circuit failure thresholds now fall back to `3` instead of opening after the first failure.
 - Cache reads now validate article payload shape before serving fresh or stale values, so schema-corrupt entries remain non-fatal and observable.
+- Runtime numeric settings now share strict positive-integer parsing, with documented caps and defaults applied consistently.
 
 ### Changed
 
