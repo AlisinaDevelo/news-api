@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { getCacheStore, resetCacheStoreForTests, setCacheStoreForTests } from "../src/cache/store";
+import {
+  getCacheStore,
+  parseRedisCacheValue,
+  resetCacheStoreForTests,
+  setCacheStoreForTests,
+} from "../src/cache/store";
 
 describe("cache", () => {
   afterEach(() => {
@@ -26,5 +31,10 @@ describe("cache", () => {
     });
 
     expect(await getCacheStore().get("anything")).toEqual(value);
+  });
+
+  it("rejects corrupted Redis JSON instead of treating it as a miss", () => {
+    expect(() => parseRedisCacheValue("{not-json")).toThrow("invalid JSON in Redis cache entry");
+    expect(parseRedisCacheValue(JSON.stringify({ articles: [] }))).toEqual({ articles: [] });
   });
 });

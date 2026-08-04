@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Split GNews-specific provider mapping and payload validation into a provider adapter, leaving the news service focused on cache/search orchestration.
 - Provider responses now validate each article and source shape before caching or returning data.
+- Malformed Redis cache JSON now surfaces through the tolerated cache error path and metrics instead of being silently treated as a miss.
 
 ### Security
 

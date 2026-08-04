@@ -82,6 +82,14 @@ function createMemoryStore(): CacheStore {
   };
 }
 
+export function parseRedisCacheValue(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error("invalid JSON in Redis cache entry");
+  }
+}
+
 function createRedisStore(url: string): CacheStore {
   const client = new Redis(url, {
     maxRetriesPerRequest: 2,
@@ -98,11 +106,7 @@ function createRedisStore(url: string): CacheStore {
       if (raw === null) {
         return undefined;
       }
-      try {
-        return JSON.parse(raw) as unknown;
-      } catch {
-        return undefined;
-      }
+      return parseRedisCacheValue(raw);
     },
     async set(key: string, value: unknown, ttlSec = TTL_SEC) {
       await client.setex(key, ttlSec, JSON.stringify(value));
