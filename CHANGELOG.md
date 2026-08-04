@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache reads now validate article payload shape before serving fresh or stale values, so schema-corrupt entries remain non-fatal and observable.
 - Runtime numeric settings now share strict positive-integer parsing, with documented caps and defaults applied consistently.
 - Provider article collections above the API maximum are rejected before they can be cached or returned.
+- Upstream Axios responses are capped at `5 MiB` before payload validation and caching.
 
 ### Changed
 

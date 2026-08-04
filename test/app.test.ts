@@ -25,7 +25,7 @@ import {
   setCacheStoreForTests,
 } from "../src/cache/store";
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
-import { MAX_ARTICLE_COUNT } from "../src/constants";
+import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../src/constants";
 
 describe("app", () => {
   beforeEach(() => {
@@ -109,6 +109,7 @@ describe("app", () => {
       expect.objectContaining({
         params: expect.objectContaining({ q: "tech", max: 2 }),
         timeout: expect.any(Number),
+        maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
       })
     );
   });

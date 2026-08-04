@@ -1,7 +1,7 @@
 import axios from "axios";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
-import { MAX_ARTICLE_COUNT } from "../constants";
+import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../constants";
 import { HttpError } from "../errors/HttpError";
 import {
   upstreamCircuitEventsTotal,
@@ -128,6 +128,7 @@ export class GNewsProvider implements NewsProvider {
       const response = await axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
         params: toProviderParams(options),
         timeout: UPSTREAM_TIMEOUT_MS,
+        maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
         validateStatus: (s) => s >= 200 && s < 300,
       });
 

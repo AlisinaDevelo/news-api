@@ -3,3 +3,4 @@ export const MAX_ARTICLE_COUNT = 100;
 export const DEFAULT_ARTICLE_PAGE = 1;
 export const MAX_ARTICLE_PAGE = 100;
 export const MAX_SEARCH_TEXT_LENGTH = 256;
+export const MAX_UPSTREAM_RESPONSE_BYTES = 5 * 1024 * 1024;
