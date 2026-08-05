@@ -14,6 +14,7 @@ spec:
       labels:
         app: news-api
     spec:
+      terminationGracePeriodSeconds: 15
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
@@ -30,6 +31,8 @@ spec:
               value: production
             - name: PORT
               value: "3000"
+            - name: SHUTDOWN_TIMEOUT_MS
+              value: "10000"
             - name: TRUST_PROXY
               value: "1"
             - name: GNEWS_API_KEY
@@ -49,6 +52,10 @@ spec:
                   name: news-api-secrets
                   key: client-api-keys
                   optional: true
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "kill -TERM 1; sleep 2"]
           livenessProbe:
             httpGet:
               path: /health

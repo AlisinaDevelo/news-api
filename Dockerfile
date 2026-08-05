@@ -19,6 +19,7 @@ COPY --chown=appuser:nodejs docs/openapi.yaml ./docs/openapi.yaml
 COPY --chown=appuser:nodejs package.json ./
 USER appuser
 EXPOSE 3000
+STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD node -e "const port=process.env.PORT||3000; fetch('http://127.0.0.1:'+port+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/server.js"]

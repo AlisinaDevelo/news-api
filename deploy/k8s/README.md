@@ -38,6 +38,19 @@ Replace `image: news-api:latest` in `deployment.yaml` with your registry referen
 
 Tune `replicas`, resources, and `TRUST_PROXY` for your ingress or service mesh.
 
+## Rollouts and shutdown
+
+The example deployment sets `SHUTDOWN_TIMEOUT_MS=10000` and a 15-second
+`terminationGracePeriodSeconds`. Its `preStop` hook sends `SIGTERM` immediately so the pod
+returns `503` from `/ready`, then waits briefly for endpoint propagation; Kubernetes may send a
+second signal after the hook, and the server handles that idempotently. Keep the grace period
+longer than the shutdown timeout when changing either value.
+
+`/health` remains a liveness probe during the drain. `server.close()` lets active requests finish,
+while the deadline aborts outbound provider calls and force-closes remaining HTTP connections.
+The hook is an example for a service mesh or load balancer that needs propagation time; remove it
+when the platform already handles endpoint removal promptly.
+
 ## OpenTelemetry
 
 Add env from a ConfigMap or Secret as needed, for example `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at your collector (DaemonSet, sidecar, or SaaS).

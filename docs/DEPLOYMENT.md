@@ -16,6 +16,7 @@ Set these variables on the hosting platform:
 | `RATE_LIMIT_WINDOW_MS` | `60000` | One-minute demo window. |
 | `CLIENT_API_KEYS` | generated secret | Recommended for a public demo; protects `/api/*`. |
 | `REDIS_URL` | managed Redis URL | Optional. Use it if the platform makes Redis cheap/easy. |
+| `SHUTDOWN_TIMEOUT_MS` | `10000` | Graceful drain deadline; give the platform a longer termination grace period. |
 
 Do not set `GNEWS_BASE_URL` in production unless you intentionally point at a compatible mock/provider. It exists for deterministic local tests, benchmarks, and CI smoke tests.
 
@@ -72,3 +73,10 @@ For a recruiter-facing public demo, the best default is:
 - Logs: `LOG_LEVEL=info`, with no API keys in logs or URLs.
 
 That gives people something real to inspect without turning your GNews quota into a public vending machine.
+
+## Container shutdown
+
+Use the platform's normal stop signal so the container receives `SIGTERM`. The service marks
+readiness as draining, lets active HTTP requests finish, and aborts outbound provider work only
+when `SHUTDOWN_TIMEOUT_MS` expires. Configure the platform's termination grace period longer than
+that deadline; the image declares `STOPSIGNAL SIGTERM` explicitly.
