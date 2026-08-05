@@ -136,7 +136,7 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses
 | `npm run client:generate` | Generate TypeScript client types from `docs/openapi.yaml`. |
 | `npm run client:check` | Regenerate client types and fail if checked-in output is stale. |
 | `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, `PAGE`, optional `CLIENT_API_KEY`). |
-| `npm run smoke:docker` | Compose smoke test: boot the image against a fake GNews provider and run `npm run smoke`. |
+| `npm run smoke:docker` | Compose smoke test: boot Redis, the image, a fake GNews provider, and two rate-limit replicas; run the HTTP smoke and shared-quota proof. |
 | `npm run benchmark:local` | Builds the app, starts a fake GNews provider, and measures cold searches vs warm cache hits. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md). |
 
 ## Project layout

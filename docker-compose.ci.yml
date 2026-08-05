@@ -1,4 +1,12 @@
 services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
   fake-gnews:
     image: node:22-alpine
     working_dir: /app
@@ -19,6 +27,8 @@ services:
     depends_on:
       fake-gnews:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
@@ -28,3 +38,44 @@ services:
       NODE_ENV: production
       DISABLE_RATE_LIMIT: "1"
       LOG_LEVEL: silent
+      REDIS_URL: redis://redis:6379
+
+  rate-limit-a:
+    build: .
+    depends_on:
+      fake-gnews:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+    environment:
+      GNEWS_API_KEY: ci
+      GNEWS_BASE_URL: http://fake-gnews:4010
+      PORT: "3000"
+      NODE_ENV: production
+      DISABLE_RATE_LIMIT: "0"
+      RATE_LIMIT_MAX: "1"
+      TRUST_PROXY: "1"
+      LOG_LEVEL: silent
+      REDIS_URL: redis://redis:6379
+
+  rate-limit-b:
+    build: .
+    depends_on:
+      fake-gnews:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3002:3000"
+    environment:
+      GNEWS_API_KEY: ci
+      GNEWS_BASE_URL: http://fake-gnews:4010
+      PORT: "3000"
+      NODE_ENV: production
+      DISABLE_RATE_LIMIT: "0"
+      RATE_LIMIT_MAX: "1"
+      TRUST_PROXY: "1"
+      LOG_LEVEL: silent
+      REDIS_URL: redis://redis:6379

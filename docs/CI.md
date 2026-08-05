@@ -18,7 +18,7 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 
 ### Container (`docker` job)
 
-10. **`npm run smoke:docker`** — Compose boots the production image against a GNews-compatible fake provider, waits for readiness, then runs `npm run smoke` against the exposed API.
+10. **`npm run smoke:docker`** — Compose boots Redis, the production image, a GNews-compatible fake provider, and two rate-limited API replicas. It waits for health/readiness, runs `npm run smoke`, then sends the same forwarded client identity to both replicas and requires `200` followed by `429` to prove the Redis-backed quota is shared across processes.
 11. **Buildx build** — [Dockerfile](../Dockerfile) with **`provenance: mode=max`** and **SBOM** (no registry push). Validates supply-chain metadata generation in CI.
 
 ### Pull requests only

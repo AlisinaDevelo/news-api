@@ -136,6 +136,12 @@ To smoke-test the production container without a live GNews key, boot the CI Com
 npm run smoke:docker
 ```
 
+The CI stack includes a health-gated Redis service, the normal smoke target, and two additional
+API replicas with `RATE_LIMIT_MAX=1`. The smoke script sends the same `X-Forwarded-For` identity
+to both replicas and requires the first request to return `200` and the second to return structured
+`429 rate_limit_exceeded`, proving that the Redis-backed quota is shared across processes. The
+normal target keeps rate limiting disabled so the endpoint/cache smoke can run its full request set.
+
 For hosted Docker deployment notes and safe public-demo defaults, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Local Benchmark
