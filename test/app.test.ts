@@ -27,6 +27,12 @@ import {
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../src/constants";
 
+function axiosErrorWithStatus(status: number): axios.AxiosError {
+  const error = new axios.AxiosError(`upstream ${status}`, "ERR_BAD_REQUEST");
+  Object.defineProperty(error, "response", { value: { status } });
+  return error;
+}
+
 describe("app", () => {
   beforeEach(() => {
     mockGet.mockReset();
@@ -515,6 +521,36 @@ describe("app", () => {
       code: "upstream_circuit_open",
       message: "Upstream news service temporarily unavailable",
     });
+    expect(mockGet).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not open the circuit for permanent upstream client errors", async () => {
+    mockGet.mockRejectedValue(axiosErrorWithStatus(401));
+    const q = `circuit-client-error-${Math.random().toString(36).slice(2)}`;
+
+    const responses = await Promise.all(
+      [1, 2, 3, 4].map((suffix) =>
+        request(app).get(`/api/v1/articles?query=${encodeURIComponent(`${q}-${suffix}`)}&count=1`)
+      )
+    );
+
+    expect(responses.map((response) => response.status)).toEqual([502, 502, 502, 502]);
+    expect(mockGet).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps circuit protection for upstream rate limits", async () => {
+    mockGet.mockRejectedValue(axiosErrorWithStatus(429));
+    const q = `circuit-rate-limit-${Math.random().toString(36).slice(2)}`;
+    const statuses: number[] = [];
+
+    for (const suffix of [1, 2, 3, 4]) {
+      const response = await request(app).get(
+        `/api/v1/articles?query=${encodeURIComponent(`${q}-${suffix}`)}&count=1`
+      );
+      statuses.push(response.status);
+    }
+
+    expect(statuses).toEqual([502, 502, 502, 503]);
     expect(mockGet).toHaveBeenCalledTimes(3);
   });
 

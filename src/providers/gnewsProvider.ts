@@ -82,6 +82,17 @@ function recordProviderFailure(): void {
   }
 }
 
+function shouldRecordProviderFailure(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) {
+    return true;
+  }
+  const status = error.response?.status;
+  if (status === undefined) {
+    return true;
+  }
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
 /** @internal tests */
 export function resetGNewsCircuitForTests(): void {
   circuit.failures = 0;
@@ -145,7 +156,9 @@ export class GNewsProvider implements NewsProvider {
         err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
       upstreamRequestsTotal.inc({ outcome });
       stopUpstreamTimer({ outcome });
-      recordProviderFailure();
+      if (shouldRecordProviderFailure(err)) {
+        recordProviderFailure();
+      }
       if (axios.isAxiosError(err)) {
         throw new HttpError(502, "Upstream news service unavailable", "upstream_unavailable");
       }
