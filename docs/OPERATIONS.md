@@ -54,6 +54,7 @@ with documented maximums are clamped.
 - Provider payloads with more than `100` articles are rejected as invalid so an upstream response cannot bypass the API's bounded collection contract.
 - The GNews client rejects response bodies larger than `5 MiB` before the payload reaches application validation.
 - Transient network/timeout and 5xx provider failures are retried with bounded exponential backoff and jitter. `429` and other 4xx responses, invalid payloads, and internal errors are not retried.
+- Provider `429` responses return `429` with code `upstream_rate_limited`; provider `503` responses return `503` with code `upstream_unavailable`. A valid provider `Retry-After` value is normalized to delta-seconds and capped at 86400 seconds, while arbitrary upstream headers are never forwarded.
 - The circuit breaker counts network failures, `408`, `425`, `429`, and 5xx responses; permanent 4xx responses remain visible as upstream errors without opening the circuit.
 - Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
 - Successful searches are also written to a longer-lived stale cache key. If a later fresh miss hits an upstream failure and stale data is available, `/api/v1/*` returns `meta.cache=stale` and `X-Cache-Status: stale` with a `200` response instead of surfacing the provider outage.

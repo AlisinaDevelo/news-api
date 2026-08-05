@@ -1,8 +1,9 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../constants";
 import { HttpError } from "../errors/HttpError";
+import { retryAfterFromHeaders } from "../http/retryAfter";
 import {
   upstreamCircuitEventsTotal,
   upstreamRequestDurationSeconds,
@@ -131,6 +132,29 @@ function toProviderParams(options: ArticleSearchOptions): Record<string, string 
   };
 }
 
+function mapAxiosError(error: AxiosError): HttpError {
+  const status = error.response?.status;
+  const retryAfter = retryAfterFromHeaders(error.response?.headers);
+
+  if (status === 429) {
+    return new HttpError(
+      429,
+      "Upstream news service rate limit exceeded",
+      "upstream_rate_limited",
+      retryAfter
+    );
+  }
+  if (status === 503) {
+    return new HttpError(
+      503,
+      "Upstream news service temporarily unavailable",
+      "upstream_unavailable",
+      retryAfter
+    );
+  }
+  return new HttpError(502, "Upstream news service unavailable", "upstream_unavailable");
+}
+
 export class GNewsProvider implements NewsProvider {
   async search(options: ArticleSearchOptions): Promise<Article[]> {
     assertCircuitAllowsRequest();
@@ -160,7 +184,7 @@ export class GNewsProvider implements NewsProvider {
         recordProviderFailure();
       }
       if (axios.isAxiosError(err)) {
-        throw new HttpError(502, "Upstream news service unavailable", "upstream_unavailable");
+        throw mapAxiosError(err);
       }
       throw err;
     }

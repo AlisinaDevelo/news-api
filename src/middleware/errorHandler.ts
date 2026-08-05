@@ -29,6 +29,9 @@ export function errorHandler(
   const log = req.log ?? logger;
 
   if (isHttpError(err)) {
+    if (err.retryAfter !== undefined) {
+      res.setHeader("Retry-After", err.retryAfter);
+    }
     if (err.statusCode >= 500) {
       log.error({ err, statusCode: err.statusCode }, err.message);
     } else {

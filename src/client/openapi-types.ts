@@ -332,6 +332,16 @@ export interface components {
                 "application/json": components["schemas"]["ErrorBody"];
             };
         };
+        /** @description Client or upstream provider rate limit exceeded; Retry-After is present when available. */
+        TooManyRequests: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorBody"];
+            };
+        };
         /** @description Upstream provider error or invalid provider payload */
         BadGateway: {
             headers: {
@@ -368,6 +378,16 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description Client or upstream provider rate limit exceeded; upstream responses use code upstream_rate_limited when available. */
+        V1TooManyRequests: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
         /** @description Upstream provider error or invalid provider payload */
         V1BadGateway: {
             headers: {
@@ -386,13 +406,24 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
-        /** @description Upstream provider circuit breaker is open */
+        /** @description Upstream provider is temporarily unavailable or the circuit breaker is open */
         V1ServiceUnavailable: {
             headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
                 "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Upstream provider is temporarily unavailable or the circuit breaker is open */
+        ServiceUnavailable: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorBody"];
             };
         };
     };
@@ -420,6 +451,8 @@ export interface components {
         ApiVersion: "v1";
         /** @description Article-search cache result for this response. */
         CacheStatus: "hit" | "miss" | "stale";
+        /** @description Normalized upstream retry delay in delta-seconds, capped at 86400 seconds. */
+        RetryAfter: string;
     };
     pathItems: never;
 }
@@ -574,13 +607,7 @@ export interface operations {
             };
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
             503: components["responses"]["V1ServiceUnavailable"];
@@ -626,13 +653,7 @@ export interface operations {
             };
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
             503: components["responses"]["V1ServiceUnavailable"];
@@ -673,13 +694,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
             503: components["responses"]["V1ServiceUnavailable"];
@@ -725,13 +740,7 @@ export interface operations {
             };
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
             503: components["responses"]["V1ServiceUnavailable"];
@@ -775,22 +784,10 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
             502: components["responses"]["BadGateway"];
-            /** @description Upstream provider circuit breaker is open */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     getArticleByTitle: {
@@ -827,22 +824,10 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
             502: components["responses"]["BadGateway"];
-            /** @description Upstream provider circuit breaker is open */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     listArticlesBySource: {
@@ -883,22 +868,10 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
             502: components["responses"]["BadGateway"];
-            /** @description Upstream provider circuit breaker is open */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
 }

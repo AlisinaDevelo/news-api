@@ -27,9 +27,12 @@ import {
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../src/constants";
 
-function axiosErrorWithStatus(status: number): axios.AxiosError {
+function axiosErrorWithStatus(
+  status: number,
+  headers: Record<string, string> = {}
+): axios.AxiosError {
   const error = new axios.AxiosError(`upstream ${status}`, "ERR_BAD_REQUEST");
-  Object.defineProperty(error, "response", { value: { status } });
+  Object.defineProperty(error, "response", { value: { status, headers } });
   return error;
 }
 
@@ -572,8 +575,62 @@ describe("app", () => {
       statuses.push(response.status);
     }
 
-    expect(statuses).toEqual([502, 502, 502, 503]);
+    expect(statuses).toEqual([429, 429, 429, 503]);
     expect(mockGet).toHaveBeenCalledTimes(3);
+  });
+
+  it("exposes a safe Retry-After for upstream rate limits without retrying", async () => {
+    vi.stubEnv("UPSTREAM_RETRY_ATTEMPTS", "3");
+    mockGet.mockRejectedValue(
+      axiosErrorWithStatus(429, {
+        "retry-after": "120",
+        "x-provider-secret": "do-not-forward",
+      })
+    );
+
+    try {
+      const v1 = await request(app).get(
+        `/api/v1/articles?query=retry-after-v1-${Math.random().toString(36).slice(2)}&count=1`
+      );
+      const legacy = await request(app).get(
+        `/api/articles?query=retry-after-legacy-${Math.random().toString(36).slice(2)}&count=1`
+      );
+
+      expect(v1.status).toBe(429);
+      expect(v1.headers["retry-after"]).toBe("120");
+      expect(v1.headers["x-provider-secret"]).toBeUndefined();
+      expect(v1.body.error).toMatchObject({
+        code: "upstream_rate_limited",
+        message: "Upstream news service rate limit exceeded",
+      });
+      expect(legacy.status).toBe(429);
+      expect(legacy.headers["retry-after"]).toBe("120");
+      expect(legacy.body.error).toBe("Upstream news service rate limit exceeded");
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("maps upstream 503 responses and caps Retry-After", async () => {
+    vi.stubEnv("UPSTREAM_RETRY_ATTEMPTS", "0");
+    mockGet.mockRejectedValueOnce(axiosErrorWithStatus(503, { "retry-after": "999999" }));
+
+    try {
+      const res = await request(app).get(
+        `/api/v1/articles?query=retry-after-503-${Math.random().toString(36).slice(2)}&count=1`
+      );
+
+      expect(res.status).toBe(503);
+      expect(res.headers["retry-after"]).toBe("86400");
+      expect(res.body.error).toMatchObject({
+        code: "upstream_unavailable",
+        message: "Upstream news service temporarily unavailable",
+      });
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("allows only one recovery probe after the circuit cooldown", async () => {

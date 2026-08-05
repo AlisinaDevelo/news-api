@@ -25,13 +25,15 @@ export class NewsApiClientError extends Error {
   readonly status: number;
   readonly code: string;
   readonly requestId?: string;
+  readonly retryAfter?: string;
 
-  constructor(status: number, error: ErrorEnvelope["error"]) {
+  constructor(status: number, error: ErrorEnvelope["error"], retryAfter?: string) {
     super(error.message);
     this.name = "NewsApiClientError";
     this.status = status;
     this.code = error.code;
     this.requestId = error.requestId;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -80,7 +82,11 @@ export class NewsApiClient {
     const body = await this.readJson(res);
     if (!res.ok) {
       if (this.isErrorEnvelope(body)) {
-        throw new NewsApiClientError(res.status, body.error);
+        throw new NewsApiClientError(
+          res.status,
+          body.error,
+          res.headers.get("retry-after") ?? undefined
+        );
       }
       throw new Error(`news-api request failed with HTTP ${res.status}`);
     }

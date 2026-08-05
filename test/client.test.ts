@@ -5,7 +5,7 @@ import { sampleArticles } from "./fixtures/articles";
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
     status: init.status ?? 200,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(init.headers ?? {}) },
   });
 }
 
@@ -67,6 +67,32 @@ describe("NewsApiClient", () => {
       status: 400,
       code: "missing_query_parameter",
       requestId: "req-err",
+    } satisfies Partial<NewsApiClientError>);
+  });
+
+  it("keeps Retry-After on structured upstream errors", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse(
+        {
+          error: {
+            code: "upstream_rate_limited",
+            message: "Upstream news service rate limit exceeded",
+            requestId: "req-limit",
+          },
+        },
+        { status: 429, headers: { "Retry-After": "120" } }
+      )
+    );
+    const client = new NewsApiClient({
+      baseUrl: "https://news-api.example",
+      fetchImpl,
+    });
+
+    await expect(client.searchArticles({ query: "postgres" })).rejects.toMatchObject({
+      name: "NewsApiClientError",
+      status: 429,
+      code: "upstream_rate_limited",
+      retryAfter: "120",
     } satisfies Partial<NewsApiClientError>);
   });
 });

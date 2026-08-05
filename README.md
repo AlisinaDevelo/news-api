@@ -119,7 +119,7 @@ GET /api/articles/source?source=BBC&count=10
 
 Search parameters are validated before the upstream request. `page` is bounded to 100, `lang` and `country` are two-letter codes, `from` and `to` must parse as ISO 8601 dates, and `sortBy` accepts `publishedAt` or `relevance`. GNews pagination may require a paid plan.
 
-Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses include `X-API-Version: v1`; v1 search responses also include `X-Cache-Status: hit|miss|stale`. Versioned errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Rate limit: `429` with standard rate-limit headers.
+Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses include `X-API-Version: v1`; v1 search responses also include `X-Cache-Status: hit|miss|stale`. Versioned errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Client and provider rate limits use `429` with standard headers; upstream throttling adds `Retry-After` when the provider supplies a valid value. Upstream temporary failures use `503` with `upstream_unavailable`.
 
 ## Scripts
 

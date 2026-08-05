@@ -46,10 +46,13 @@ try {
   await client.searchArticles({ query: "" });
 } catch (err) {
   if (err instanceof NewsApiClientError) {
-    console.error(err.status, err.code, err.requestId);
+    console.error(err.status, err.code, err.requestId, err.retryAfter);
   }
 }
 ```
+
+For upstream throttling or temporary unavailability, `NewsApiClientError.retryAfter` contains the
+validated `Retry-After` delta-seconds value when the API received one.
 
 The wrapper intentionally targets `/api/v1/*` only. Legacy `/api/articles*` routes remain
 available for backward compatibility, but new consumers should use v1 envelopes.
