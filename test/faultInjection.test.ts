@@ -20,6 +20,8 @@ vi.mock("axios", async (importOriginal) => {
 import app from "../src/app";
 import { CacheCorruptionError, resetCacheStoreForTests, setCacheStoreForTests } from "../src/cache/store";
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
+import { resetNewsServiceForTests, searchArticles } from "../src/services/newsService";
+import { register } from "../src/metrics/register";
 import { sampleArticles } from "./fixtures/articles";
 
 function axiosErrorWithStatus(
@@ -215,12 +217,15 @@ describe("degraded-mode fault matrix", () => {
     mockGet.mockReset();
     resetCacheStoreForTests();
     resetGNewsCircuitForTests();
+    resetNewsServiceForTests();
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.useRealTimers();
     resetCacheStoreForTests();
     resetGNewsCircuitForTests();
+    resetNewsServiceForTests();
   });
 
   it.each(toleratedFaults)("$name has a bounded public outcome", async (faultCase) => {
@@ -247,5 +252,37 @@ describe("degraded-mode fault matrix", () => {
 
     expect(statuses).toEqual([502, 502, 502, 503]);
     expect(mockGet).toHaveBeenCalledTimes(3);
+  });
+
+  it("maps total upstream deadline exhaustion to a transient provider failure", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("UPSTREAM_CIRCUIT_FAILURE_THRESHOLD", "1");
+    mockGet.mockImplementation((_url: string, config: { signal: AbortSignal }) => {
+      return new Promise((_resolve, reject) => {
+        config.signal.addEventListener(
+          "abort",
+          () => reject(new axios.AxiosError("deadline", "ERR_CANCELED")),
+          { once: true }
+        );
+      });
+    });
+
+    const pending = searchArticles({
+      query: `fault-total-deadline-${Date.now()}`,
+      count: 1,
+      page: 1,
+    });
+    await vi.waitFor(() => expect(mockGet).toHaveBeenCalledTimes(1));
+    vi.advanceTimersByTime(60_000);
+
+    await expect(pending).rejects.toMatchObject({
+      statusCode: 502,
+      code: "upstream_unavailable",
+    });
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    const metrics = await register.metrics();
+    expect(metrics).toContain('news_upstream_requests_total{outcome="timeout"}');
+    expect(metrics).toContain('news_upstream_circuit_events_total{event="opened"}');
+    vi.useRealTimers();
   });
 });

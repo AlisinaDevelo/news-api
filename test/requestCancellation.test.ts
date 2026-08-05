@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Response } from "express";
 import {
   combineAbortSignals,
+  createAbortDeadline,
   createRequestAbortSignal,
 } from "../src/runtime/requestCancellation";
 import { resetLifecycleForTests } from "../src/runtime/lifecycle";
@@ -47,5 +48,24 @@ describe("request cancellation", () => {
     client.abort();
 
     expect(combined.aborted).toBe(true);
+  });
+
+  it("cancels a deadline timer after work completes", () => {
+    vi.useFakeTimers();
+    const deadline = createAbortDeadline(1_000);
+
+    deadline.cancel();
+    vi.advanceTimersByTime(1_000);
+
+    expect(deadline.signal.aborted).toBe(false);
+  });
+
+  it("aborts at the total deadline", () => {
+    vi.useFakeTimers();
+    const deadline = createAbortDeadline(1_000);
+
+    vi.advanceTimersByTime(1_000);
+
+    expect(deadline.signal.aborted).toBe(true);
   });
 });

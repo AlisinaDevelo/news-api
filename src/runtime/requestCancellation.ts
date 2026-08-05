@@ -54,6 +54,21 @@ export function combineAbortSignals(...signals: Array<AbortSignal | undefined>):
   return controller.signal;
 }
 
+export interface AbortDeadline {
+  signal: AbortSignal;
+  cancel(): void;
+}
+
+export function createAbortDeadline(timeoutMs: number): AbortDeadline {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  timer.unref?.();
+  return {
+    signal: controller.signal,
+    cancel: () => clearTimeout(timer),
+  };
+}
+
 export function createRequestAbortSignal(res: Response): AbortSignal {
   const controller = new AbortController();
   const abortOnPrematureClose = (): void => {

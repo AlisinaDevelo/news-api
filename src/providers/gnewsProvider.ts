@@ -1,6 +1,10 @@
 import axios, { AxiosError } from "axios";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
-import { UPSTREAM_BASE_URL, UPSTREAM_TIMEOUT_MS } from "../config/upstream";
+import {
+  UPSTREAM_BASE_URL,
+  UPSTREAM_TIMEOUT_MS,
+  UPSTREAM_TOTAL_TIMEOUT_MS,
+} from "../config/upstream";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../constants";
 import { HttpError } from "../errors/HttpError";
 import { retryAfterFromHeaders } from "../http/retryAfter";
@@ -15,6 +19,7 @@ import { withSpan } from "../tracing";
 import { shutdownSignal } from "../runtime/lifecycle";
 import {
   combineAbortSignals,
+  createAbortDeadline,
   isRequestAbortedError,
   RequestAbortedError,
   throwIfAborted,
@@ -169,70 +174,86 @@ function mapAxiosError(error: AxiosError): HttpError {
 
 export class GNewsProvider implements NewsProvider {
   async search(options: ArticleSearchOptions, signal?: AbortSignal): Promise<Article[]> {
-    const requestSignal = combineAbortSignals(signal, shutdownSignal());
-    throwIfAborted(requestSignal);
-    const circuitState = await withSpan("news.upstream.circuit", {}, async (span) => {
-      try {
-        const state = assertCircuitAllowsRequest();
-        span.setAttribute("news.circuit.state", state);
-        return state;
-      } catch (err) {
-        span.setAttribute("news.circuit.state", "open");
-        span.setAttribute("news.circuit.event", "short_circuit");
-        throw err;
-      }
-    });
-
-    const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
-    return withSpan(
-      "news.upstream.request",
-      {
-        "news.upstream.provider": "gnews",
-        "news.circuit.state": circuitState,
-      },
-      async (span) => {
+    const deadline = createAbortDeadline(UPSTREAM_TOTAL_TIMEOUT_MS);
+    const processSignal = shutdownSignal();
+    const requestSignal = combineAbortSignals(signal, processSignal, deadline.signal);
+    try {
+      throwIfAborted(requestSignal);
+      const circuitState = await withSpan("news.upstream.circuit", {}, async (span) => {
         try {
-          const response = await withUpstreamRetries(
-            () =>
-              axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
-                params: toProviderParams(options),
-                timeout: UPSTREAM_TIMEOUT_MS,
-                signal: requestSignal,
-                maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
-                validateStatus: (s) => s >= 200 && s < 300,
-              }),
-            requestSignal
-          );
-
-          throwIfAborted(requestSignal);
-          const articles = normalizeArticles(response.data);
-          span.setAttribute("news.upstream.outcome", "success");
-          upstreamRequestsTotal.inc({ outcome: "success" });
-          stopUpstreamTimer({ outcome: "success" });
-          recordProviderSuccess();
-          return articles;
+          const state = assertCircuitAllowsRequest();
+          span.setAttribute("news.circuit.state", state);
+          return state;
         } catch (err) {
-          if (requestSignal.aborted || isRequestAbortedError(err)) {
-            span.setAttribute("news.upstream.outcome", "canceled");
-            upstreamRequestsTotal.inc({ outcome: "canceled" });
-            stopUpstreamTimer({ outcome: "canceled" });
-            throw err instanceof RequestAbortedError ? err : new RequestAbortedError();
-          }
-          const outcome =
-            err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
-          span.setAttribute("news.upstream.outcome", outcome);
-          upstreamRequestsTotal.inc({ outcome });
-          stopUpstreamTimer({ outcome });
-          if (shouldRecordProviderFailure(err)) {
-            recordProviderFailure();
-          }
-          if (axios.isAxiosError(err)) {
-            throw mapAxiosError(err);
-          }
+          span.setAttribute("news.circuit.state", "open");
+          span.setAttribute("news.circuit.event", "short_circuit");
           throw err;
         }
-      }
-    );
+      });
+
+      const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
+      return await withSpan(
+        "news.upstream.request",
+        {
+          "news.upstream.provider": "gnews",
+          "news.circuit.state": circuitState,
+        },
+        async (span) => {
+          try {
+            const response = await withUpstreamRetries(
+              () =>
+                axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
+                  params: toProviderParams(options),
+                  timeout: UPSTREAM_TIMEOUT_MS,
+                  signal: requestSignal,
+                  maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
+                  validateStatus: (s) => s >= 200 && s < 300,
+                }),
+              requestSignal
+            );
+
+            throwIfAborted(requestSignal);
+            const articles = normalizeArticles(response.data);
+            span.setAttribute("news.upstream.outcome", "success");
+            upstreamRequestsTotal.inc({ outcome: "success" });
+            stopUpstreamTimer({ outcome: "success" });
+            recordProviderSuccess();
+            return articles;
+          } catch (err) {
+            const deadlineExceeded =
+              deadline.signal.aborted && !signal?.aborted && !processSignal.aborted;
+            if (deadlineExceeded) {
+              const timeoutError = new AxiosError("upstream total timeout", "ETIMEDOUT");
+              span.setAttribute("news.upstream.outcome", "timeout");
+              upstreamRequestsTotal.inc({ outcome: "timeout" });
+              stopUpstreamTimer({ outcome: "timeout" });
+              recordProviderFailure();
+              throw mapAxiosError(timeoutError);
+            }
+            if (requestSignal.aborted || isRequestAbortedError(err)) {
+              span.setAttribute("news.upstream.outcome", "canceled");
+              upstreamRequestsTotal.inc({ outcome: "canceled" });
+              stopUpstreamTimer({ outcome: "canceled" });
+              throw err instanceof RequestAbortedError ? err : new RequestAbortedError();
+            }
+            const outcome =
+              err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
+            span.setAttribute("news.upstream.outcome", outcome);
+            upstreamRequestsTotal.inc({ outcome });
+            stopUpstreamTimer({ outcome });
+            if (shouldRecordProviderFailure(err)) {
+              recordProviderFailure();
+            }
+            if (axios.isAxiosError(err)) {
+              throw mapAxiosError(err);
+            }
+            throw err;
+          }
+        }
+      );
+    } finally {
+      deadline.cancel();
+    }
   }
 }
 
