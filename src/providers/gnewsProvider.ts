@@ -13,10 +13,16 @@ import { isArticleList, type Article } from "../types/article";
 import { ArticleSearchOptions } from "../types/search";
 import { withSpan } from "../tracing";
 import { shutdownSignal } from "../runtime/lifecycle";
+import {
+  combineAbortSignals,
+  isRequestAbortedError,
+  RequestAbortedError,
+  throwIfAborted,
+} from "../runtime/requestCancellation";
 import { withUpstreamRetries } from "./retry";
 
 export interface NewsProvider {
-  search(options: ArticleSearchOptions): Promise<Article[]>;
+  search(options: ArticleSearchOptions, signal?: AbortSignal): Promise<Article[]>;
 }
 
 interface CircuitState {
@@ -87,6 +93,9 @@ function recordProviderFailure(): void {
 }
 
 function shouldRecordProviderFailure(error: unknown): boolean {
+  if (isRequestAbortedError(error)) {
+    return false;
+  }
   if (!axios.isAxiosError(error)) {
     return true;
   }
@@ -159,7 +168,9 @@ function mapAxiosError(error: AxiosError): HttpError {
 }
 
 export class GNewsProvider implements NewsProvider {
-  async search(options: ArticleSearchOptions): Promise<Article[]> {
+  async search(options: ArticleSearchOptions, signal?: AbortSignal): Promise<Article[]> {
+    const requestSignal = combineAbortSignals(signal, shutdownSignal());
+    throwIfAborted(requestSignal);
     const circuitState = await withSpan("news.upstream.circuit", {}, async (span) => {
       try {
         const state = assertCircuitAllowsRequest();
@@ -181,16 +192,19 @@ export class GNewsProvider implements NewsProvider {
       },
       async (span) => {
         try {
-          const response = await withUpstreamRetries(() =>
-            axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
-              params: toProviderParams(options),
-              timeout: UPSTREAM_TIMEOUT_MS,
-              signal: shutdownSignal(),
-              maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
-              validateStatus: (s) => s >= 200 && s < 300,
-            })
+          const response = await withUpstreamRetries(
+            () =>
+              axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
+                params: toProviderParams(options),
+                timeout: UPSTREAM_TIMEOUT_MS,
+                signal: requestSignal,
+                maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
+                validateStatus: (s) => s >= 200 && s < 300,
+              }),
+            requestSignal
           );
 
+          throwIfAborted(requestSignal);
           const articles = normalizeArticles(response.data);
           span.setAttribute("news.upstream.outcome", "success");
           upstreamRequestsTotal.inc({ outcome: "success" });
@@ -198,6 +212,12 @@ export class GNewsProvider implements NewsProvider {
           recordProviderSuccess();
           return articles;
         } catch (err) {
+          if (requestSignal.aborted || isRequestAbortedError(err)) {
+            span.setAttribute("news.upstream.outcome", "canceled");
+            upstreamRequestsTotal.inc({ outcome: "canceled" });
+            stopUpstreamTimer({ outcome: "canceled" });
+            throw err instanceof RequestAbortedError ? err : new RequestAbortedError();
+          }
           const outcome =
             err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
           span.setAttribute("news.upstream.outcome", outcome);

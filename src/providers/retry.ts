@@ -4,6 +4,11 @@ import {
   resolvePositiveIntegerEnv,
 } from "../config/numbers";
 import { upstreamRetriesTotal } from "../metrics/register";
+import {
+  isRequestAbortedError,
+  RequestAbortedError,
+  throwIfAborted,
+} from "../runtime/requestCancellation";
 import { withSpan } from "../tracing";
 
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 500, 502, 503, 504]);
@@ -42,8 +47,20 @@ function retryDelayMs(attempt: number): number {
   return Math.max(1, Math.round(exponential * (0.5 + Math.random())));
 }
 
-function sleep(delayMs: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, delayMs));
+function sleep(delayMs: number, signal?: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(new RequestAbortedError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function retryReason(error: unknown): string {
@@ -59,13 +76,20 @@ function retryReason(error: unknown): string {
   return "transient_error";
 }
 
-export async function withUpstreamRetries<T>(operation: () => Promise<T>): Promise<T> {
+export async function withUpstreamRetries<T>(
+  operation: () => Promise<T>,
+  signal?: AbortSignal
+): Promise<T> {
   const maxRetries = retryAttempts();
 
   for (let attempt = 0; ; attempt += 1) {
     try {
+      throwIfAborted(signal);
       return await operation();
     } catch (error) {
+      if (signal?.aborted || isRequestAbortedError(error)) {
+        throw error instanceof RequestAbortedError ? error : new RequestAbortedError();
+      }
       if (attempt >= maxRetries || !isRetryableUpstreamError(error)) {
         throw error;
       }
@@ -76,7 +100,7 @@ export async function withUpstreamRetries<T>(operation: () => Promise<T>): Promi
           "news.retry.attempt": attempt + 1,
           "news.retry.reason": retryReason(error),
         },
-        () => sleep(retryDelayMs(attempt))
+        () => sleep(retryDelayMs(attempt), signal)
       );
     }
   }

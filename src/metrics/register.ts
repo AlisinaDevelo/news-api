@@ -38,6 +38,13 @@ export const rateLimitStoreErrorsTotal = new Counter({
   registers: [register],
 });
 
+export const requestCancellationsTotal = new Counter({
+  name: "news_request_cancellations_total",
+  help: "Total downstream request cancellations by reason",
+  labelNames: ["reason"],
+  registers: [register],
+});
+
 export const upstreamRequestsTotal = new Counter({
   name: "news_upstream_requests_total",
   help: "Total upstream news provider requests by outcome",
