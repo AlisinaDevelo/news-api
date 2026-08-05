@@ -221,4 +221,32 @@ describe("cross-replica cache coordination", () => {
     releaseLoad?.();
     await expect(pending).resolves.toMatchObject({ value: "articles", source: "upstream" });
   });
+
+  it("does not return a cache value after cancellation during the final cache read", async () => {
+    const controller = new AbortController();
+    let resolveCacheRead: ((value: string) => void) | undefined;
+    const load = vi.fn(async () => "upstream");
+    const pending = coordinateCacheMiss({
+      store: baseStore({
+        async tryAcquireLease() {
+          return true;
+        },
+        async releaseLease() {},
+      }),
+      cacheKey: "canceled-cache-read",
+      signal: controller.signal,
+      readFresh: () =>
+        new Promise<string>((resolve) => {
+          resolveCacheRead = resolve;
+        }),
+      load,
+    });
+
+    await vi.waitFor(() => expect(resolveCacheRead).toBeDefined());
+    controller.abort();
+    resolveCacheRead?.("articles");
+
+    await expect(pending).rejects.toBeInstanceOf(RequestAbortedError);
+    expect(load).not.toHaveBeenCalled();
+  });
 });

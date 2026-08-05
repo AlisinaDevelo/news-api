@@ -159,6 +159,7 @@ export async function coordinateCacheMiss<T>(
       try {
         try {
           const cached = await options.readFresh();
+          throwIfAborted(options.signal);
           if (cached !== undefined) {
             cacheCoordinationEventsTotal.inc({ event: "hit" });
             return { value: cached, source: "shared-cache" };
@@ -188,6 +189,7 @@ export async function coordinateCacheMiss<T>(
     let cached: T | undefined;
     try {
       cached = await options.readFresh();
+      throwIfAborted(options.signal);
     } catch (error) {
       if (options.signal?.aborted) {
         throw error instanceof RequestAbortedError ? error : new RequestAbortedError();
