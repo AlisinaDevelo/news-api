@@ -28,6 +28,10 @@
 | `OTEL_SERVICE_NAME` | `news-api` | `service.name` resource attribute. |
 | `OTEL_TRACING_ENABLED` | `0` | Set to `1` to export traces to default `http://127.0.0.1:4318/v1/traces` when no OTLP endpoint env is set (local dev). |
 
+Responses at or above 1 KiB are gzip-compressed when the client sends `Accept-Encoding: gzip`.
+If an ingress or reverse proxy owns compression, disable compression at one layer so a response
+is not compressed twice.
+
 Runtime numeric settings are parsed as safe integers. Fractional, non-finite, negative, or
 malformed values use their documented defaults; optional retry counts may be `0`, and settings
 with documented maximums are clamped.

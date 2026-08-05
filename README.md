@@ -17,7 +17,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 ## Production-oriented features
 
 - **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting, optional `TRUST_PROXY` for correct client IPs behind a load balancer, optional **`CLIENT_API_KEYS`** + `X-API-Key` on `/api/*`.
-- **Reliability:** Upstream HTTP timeouts, response validation, bounded cache capacity, stale-on-error cache fallback, `502` for provider/transport failures, provider circuit breaker with `503` short-circuiting, graceful shutdown on `SIGTERM` / `SIGINT`.
+- **Reliability:** Upstream HTTP timeouts, response validation, bounded cache capacity, stale-on-error cache fallback, gzip compression for responses at or above 1 KiB, `502` for provider/transport failures, provider circuit breaker with `503` short-circuiting, graceful shutdown on `SIGTERM` / `SIGINT`.
 - **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss/stale/error/coalescing/eviction + upstream latency/circuit metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`).
 - **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured).
 - **Supply chain:** `npm audit` in CI; **SPDX SBOM** artifacts; Docker builds with **SBOM + provenance**; **dependency review** on PRs; optional **SLSA-style lockfile attestation** on `main`; lockfile-only installs.

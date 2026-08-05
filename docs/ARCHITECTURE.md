@@ -14,7 +14,7 @@ flowchart LR
 ```
 
 1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented.
-2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`), then mounts `/api` routes.
+2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`), then mounts `/api` routes.
 3. **Controllers** validate query parameters and map domain results to HTTP status codes.
 4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `page`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and delegates upstream fetches to the GNews provider adapter. Cache backend errors are logged and metriced without failing the article request.
 5. **Provider adapter** maps domain search options to GNews parameters, validates provider payloads, records upstream metrics, and opens a short circuit after repeated provider failures so outages are shed locally instead of amplified.
@@ -89,6 +89,8 @@ Unhandled promise rejections in async route handlers are forwarded by `asyncHand
 Article arrays are stored per normalized search key with a **600-second** TTL (`src/cache/store.ts`). Without `REDIS_URL`, `node-cache` is used with a configurable `CACHE_MAX_KEYS` bound and least-recently-used eviction (default `2000`); with `REDIS_URL`, **ioredis** stores JSON payloads for shared caches across replicas.
 
 The service treats the cache as a quota and latency optimization, not as a hard dependency. Read failures fall through to the upstream provider, write failures return the upstream response without caching it, and both paths emit warning logs plus cache error metrics. In-memory capacity is handled by evicting the least-recently-used entry, with eviction counts exposed as a metric. Within a single process, concurrent misses for the same normalized key are coalesced so only the first request calls the provider.
+
+Responses at or above 1 KiB are compressed when the client advertises support. In a deployment with an ingress or reverse proxy, choose one compression owner to avoid double compression; the application default is useful for direct Node deployments and local demos.
 
 Successful upstream searches write both a fresh cache key and a longer-lived stale key. The fresh key protects latency and quota under normal conditions; the stale key is only read after an upstream failure. Versioned responses expose this through `meta.cache=stale` and `X-Cache-Status: stale`.
 

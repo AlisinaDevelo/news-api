@@ -94,6 +94,28 @@ describe("app", () => {
     expect(res.text).toContain("http_requests_total");
   });
 
+  it("compresses large API responses when the client accepts gzip", async () => {
+    const largeArticles = Array.from({ length: 10 }, (_, index) => ({
+      ...sampleArticles[0],
+      title: `${"Large article ".repeat(16)}${index}`,
+      description: "A response large enough to exercise the production compression threshold.",
+    }));
+    mockGet.mockResolvedValue({ data: { articles: largeArticles } });
+
+    const compressed = await request(app)
+      .get(`/api/v1/articles?query=compression-gzip-${Date.now()}&count=10`)
+      .set("Accept-Encoding", "gzip");
+    const plain = await request(app)
+      .get(`/api/v1/articles?query=compression-plain-${Date.now()}&count=10`)
+      .set("Accept-Encoding", "identity");
+
+    expect(compressed.status).toBe(200);
+    expect(compressed.headers["content-encoding"]).toBe("gzip");
+    expect(compressed.headers.vary).toContain("Accept-Encoding");
+    expect(compressed.body.data).toEqual(plain.body.data);
+    expect(plain.headers["content-encoding"]).toBeUndefined();
+  });
+
   it("GET /api/articles without query returns 400", async () => {
     const res = await request(app).get("/api/articles");
     expect(res.status).toBe(400);

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import compression from "compression";
 import express from "express";
 import routes from "./routes";
 import { HttpError } from "./errors/HttpError";
@@ -11,6 +12,7 @@ import { httpLogger } from "./logger";
 import { metricsRequestObserver } from "./middleware/metricsHttp";
 import { clientApiKeyGate } from "./middleware/clientApiKey";
 import { register as metricsRegister } from "./metrics/register";
+import { DEFAULT_COMPRESSION_THRESHOLD_BYTES } from "./constants";
 
 const openApiFile = path.resolve(process.cwd(), "docs", "openapi.yaml");
 
@@ -20,6 +22,7 @@ applyTrustProxy(app);
 app.use(httpLogger);
 app.use(metricsRequestObserver);
 app.use(securityHeaders);
+app.use(compression({ threshold: DEFAULT_COMPRESSION_THRESHOLD_BYTES }));
 app.use(express.json());
 app.use(apiRateLimiter);
 
