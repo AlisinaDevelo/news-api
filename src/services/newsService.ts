@@ -5,6 +5,7 @@ import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 import { cacheErrorsTotal, cacheEventsTotal } from "../metrics/register";
 import { logger } from "../logger";
 import { newsProvider } from "../providers/gnewsProvider";
+import { markSpanError, withSpan } from "../tracing";
 
 const inFlightSearches = new Map<string, Promise<ArticleSearchResult>>();
 const STALE_CACHE_TTL_SEC = resolveStaleCacheTtlSec();
@@ -42,67 +43,90 @@ async function readCachedArticles(
   store: CacheStore,
   cacheKey: string
 ): Promise<ArticleSearchResult | undefined> {
-  let cached: unknown | undefined;
-  try {
-    cached = await store.get(cacheKey);
-  } catch (err) {
-    cacheEventsTotal.inc({ result: "error" });
-    cacheErrorsTotal.inc({ operation: "get" });
-    logger.warn({ err }, "cache get failed; falling through to upstream");
-    if (err instanceof CacheCorruptionError) {
-      await deleteCorruptCacheEntry(store, cacheKey, "delete");
-    }
-    return undefined;
-  }
-
-  if (cached !== undefined) {
-    if (!isArticleList(cached)) {
+  return withSpan("news.cache.lookup", { "news.cache.kind": "fresh" }, async (span) => {
+    let cached: unknown | undefined;
+    try {
+      cached = await store.get(cacheKey);
+    } catch (err) {
+      span.setAttribute("news.cache.result", "error");
+      markSpanError(span, err, "cache_get_failed");
       cacheEventsTotal.inc({ result: "error" });
       cacheErrorsTotal.inc({ operation: "get" });
-      logger.warn({ err: new Error("invalid cached article payload") }, "cache payload is invalid");
-      await deleteCorruptCacheEntry(store, cacheKey, "delete");
+      logger.warn({ err }, "cache get failed; falling through to upstream");
+      if (err instanceof CacheCorruptionError) {
+        await deleteCorruptCacheEntry(store, cacheKey, "delete");
+      }
       return undefined;
     }
-    cacheEventsTotal.inc({ result: "hit" });
-    return { articles: cached, cache: "hit" };
-  }
 
-  cacheEventsTotal.inc({ result: "miss" });
-  return undefined;
+    if (cached !== undefined) {
+      if (!isArticleList(cached)) {
+        span.setAttribute("news.cache.result", "invalid");
+        markSpanError(span, new Error("invalid cached article payload"), "cache_payload_invalid");
+        cacheEventsTotal.inc({ result: "error" });
+        cacheErrorsTotal.inc({ operation: "get" });
+        logger.warn(
+          { err: new Error("invalid cached article payload") },
+          "cache payload is invalid"
+        );
+        await deleteCorruptCacheEntry(store, cacheKey, "delete");
+        return undefined;
+      }
+      span.setAttribute("news.cache.result", "hit");
+      cacheEventsTotal.inc({ result: "hit" });
+      return { articles: cached, cache: "hit" };
+    }
+
+    span.setAttribute("news.cache.result", "miss");
+    cacheEventsTotal.inc({ result: "miss" });
+    return undefined;
+  });
 }
 
 async function readStaleCachedArticles(
   store: CacheStore,
   cacheKey: string
 ): Promise<ArticleSearchResult | undefined> {
-  const staleKey = staleCacheKey(cacheKey);
-  let cached: unknown | undefined;
-  try {
-    cached = await store.get(staleKey);
-  } catch (err) {
-    cacheErrorsTotal.inc({ operation: "get_stale" });
-    logger.warn({ err }, "stale cache get failed; returning upstream error");
-    if (err instanceof CacheCorruptionError) {
-      await deleteCorruptCacheEntry(store, staleKey, "delete_stale");
-    }
-    return undefined;
-  }
-
-  if (cached !== undefined) {
-    if (!isArticleList(cached)) {
+  return withSpan("news.cache.lookup", { "news.cache.kind": "stale" }, async (span) => {
+    const staleKey = staleCacheKey(cacheKey);
+    let cached: unknown | undefined;
+    try {
+      cached = await store.get(staleKey);
+    } catch (err) {
+      span.setAttribute("news.cache.result", "error");
+      markSpanError(span, err, "stale_cache_get_failed");
       cacheErrorsTotal.inc({ operation: "get_stale" });
-      logger.warn(
-        { err: new Error("invalid stale cached article payload") },
-        "stale cache payload is invalid"
-      );
-      await deleteCorruptCacheEntry(store, staleKey, "delete_stale");
+      logger.warn({ err }, "stale cache get failed; returning upstream error");
+      if (err instanceof CacheCorruptionError) {
+        await deleteCorruptCacheEntry(store, staleKey, "delete_stale");
+      }
       return undefined;
     }
-    cacheEventsTotal.inc({ result: "stale" });
-    return { articles: cached, cache: "stale" };
-  }
 
-  return undefined;
+    if (cached !== undefined) {
+      if (!isArticleList(cached)) {
+        span.setAttribute("news.cache.result", "invalid");
+        markSpanError(
+          span,
+          new Error("invalid stale cached article payload"),
+          "stale_cache_payload_invalid"
+        );
+        cacheErrorsTotal.inc({ operation: "get_stale" });
+        logger.warn(
+          { err: new Error("invalid stale cached article payload") },
+          "stale cache payload is invalid"
+        );
+        await deleteCorruptCacheEntry(store, staleKey, "delete_stale");
+        return undefined;
+      }
+      span.setAttribute("news.cache.result", "stale");
+      cacheEventsTotal.inc({ result: "stale" });
+      return { articles: cached, cache: "stale" };
+    }
+
+    span.setAttribute("news.cache.result", "miss");
+    return undefined;
+  });
 }
 
 async function deleteCorruptCacheEntry(
@@ -123,19 +147,29 @@ async function writeCachedArticles(
   cacheKey: string,
   articles: Article[]
 ): Promise<void> {
-  try {
-    await store.set(cacheKey, articles);
-  } catch (err) {
-    cacheErrorsTotal.inc({ operation: "set" });
-    logger.warn({ err }, "cache set failed; returning upstream response without caching");
-  }
+  await withSpan("news.cache.write", { "news.cache.kind": "fresh" }, async (span) => {
+    try {
+      await store.set(cacheKey, articles);
+      span.setAttribute("news.cache.result", "success");
+    } catch (err) {
+      span.setAttribute("news.cache.result", "error");
+      markSpanError(span, err, "cache_set_failed");
+      cacheErrorsTotal.inc({ operation: "set" });
+      logger.warn({ err }, "cache set failed; returning upstream response without caching");
+    }
+  });
 
-  try {
-    await store.set(staleCacheKey(cacheKey), articles, STALE_CACHE_TTL_SEC);
-  } catch (err) {
-    cacheErrorsTotal.inc({ operation: "set_stale" });
-    logger.warn({ err }, "stale cache set failed; returning upstream response without stale copy");
-  }
+  await withSpan("news.cache.write", { "news.cache.kind": "stale" }, async (span) => {
+    try {
+      await store.set(staleCacheKey(cacheKey), articles, STALE_CACHE_TTL_SEC);
+      span.setAttribute("news.cache.result", "success");
+    } catch (err) {
+      span.setAttribute("news.cache.result", "error");
+      markSpanError(span, err, "stale_cache_set_failed");
+      cacheErrorsTotal.inc({ operation: "set_stale" });
+      logger.warn({ err }, "stale cache set failed; returning upstream response without stale copy");
+    }
+  });
 }
 
 async function fetchArticlesFromUpstream(
@@ -147,12 +181,20 @@ async function fetchArticlesFromUpstream(
   try {
     articles = await newsProvider.search(options);
   } catch (err) {
-    const stale = await readStaleCachedArticles(store, cacheKey);
-    if (stale) {
-      logger.warn({ err }, "upstream failed; returning stale cached articles");
-      return stale;
-    }
-    throw err;
+    return withSpan(
+      "news.cache.stale_fallback",
+      { "news.fallback.reason": "upstream_error" },
+      async (span) => {
+        const stale = await readStaleCachedArticles(store, cacheKey);
+        if (stale) {
+          span.setAttribute("news.fallback.result", "served");
+          logger.warn({ err }, "upstream failed; returning stale cached articles");
+          return stale;
+        }
+        span.setAttribute("news.fallback.result", "unavailable");
+        throw err;
+      }
+    );
   }
 
   await writeCachedArticles(store, cacheKey, articles);
@@ -161,29 +203,35 @@ async function fetchArticlesFromUpstream(
 
 export const searchArticles = async (
   options: ArticleSearchOptions
-): Promise<ArticleSearchResult> => {
-  const cacheKey = searchCacheKey(options);
-  const store = getCacheStore();
-  const cached = await readCachedArticles(store, cacheKey);
-  if (cached) {
-    return cached;
-  }
+): Promise<ArticleSearchResult> =>
+  withSpan("news.search", {}, async (span) => {
+    const cacheKey = searchCacheKey(options);
+    const store = getCacheStore();
+    const cached = await readCachedArticles(store, cacheKey);
+    if (cached) {
+      span.setAttribute("news.search.cache", cached.cache);
+      return cached;
+    }
 
-  const existing = inFlightSearches.get(cacheKey);
-  if (existing) {
-    cacheEventsTotal.inc({ result: "coalesced" });
-    const result = await existing;
-    return { ...result, cache: result.cache === "miss" ? "coalesced" : result.cache };
-  }
+    const existing = inFlightSearches.get(cacheKey);
+    if (existing) {
+      cacheEventsTotal.inc({ result: "coalesced" });
+      const result = await existing;
+      const coalesced = { ...result, cache: result.cache === "miss" ? "coalesced" : result.cache };
+      span.setAttribute("news.search.cache", coalesced.cache);
+      return coalesced;
+    }
 
-  const search = fetchArticlesFromUpstream(options, store, cacheKey);
-  inFlightSearches.set(cacheKey, search);
-  try {
-    return await search;
-  } finally {
-    inFlightSearches.delete(cacheKey);
-  }
-};
+    const search = fetchArticlesFromUpstream(options, store, cacheKey);
+    inFlightSearches.set(cacheKey, search);
+    try {
+      const result = await search;
+      span.setAttribute("news.search.cache", result.cache);
+      return result;
+    } finally {
+      inFlightSearches.delete(cacheKey);
+    }
+  });
 
 export const fetchArticles = async (options: ArticleSearchOptions): Promise<Article[]> => {
   const result = await searchArticles(options);

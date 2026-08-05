@@ -11,6 +11,7 @@ import {
 } from "../metrics/register";
 import { isArticleList, type Article } from "../types/article";
 import { ArticleSearchOptions } from "../types/search";
+import { withSpan } from "../tracing";
 import { withUpstreamRetries } from "./retry";
 
 export interface NewsProvider {
@@ -37,7 +38,7 @@ function cooldownMs(): number {
   return resolvePositiveIntegerEnv(process.env.UPSTREAM_CIRCUIT_COOLDOWN_MS, 30_000, 300_000);
 }
 
-function assertCircuitAllowsRequest(now = Date.now()): void {
+function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
   if (circuit.openedAt === undefined && circuit.halfOpenInFlight) {
     upstreamCircuitEventsTotal.inc({ event: "short_circuit" });
     throw new HttpError(
@@ -48,7 +49,7 @@ function assertCircuitAllowsRequest(now = Date.now()): void {
   }
 
   if (circuit.openedAt === undefined) {
-    return;
+    return "closed";
   }
 
   if (now - circuit.openedAt < cooldownMs()) {
@@ -63,6 +64,7 @@ function assertCircuitAllowsRequest(now = Date.now()): void {
   circuit.openedAt = undefined;
   circuit.halfOpenInFlight = true;
   upstreamCircuitEventsTotal.inc({ event: "half_open" });
+  return "half_open";
 }
 
 function recordProviderSuccess(): void {
@@ -157,37 +159,58 @@ function mapAxiosError(error: AxiosError): HttpError {
 
 export class GNewsProvider implements NewsProvider {
   async search(options: ArticleSearchOptions): Promise<Article[]> {
-    assertCircuitAllowsRequest();
+    const circuitState = await withSpan("news.upstream.circuit", {}, async (span) => {
+      try {
+        const state = assertCircuitAllowsRequest();
+        span.setAttribute("news.circuit.state", state);
+        return state;
+      } catch (err) {
+        span.setAttribute("news.circuit.state", "open");
+        span.setAttribute("news.circuit.event", "short_circuit");
+        throw err;
+      }
+    });
+
     const stopUpstreamTimer = upstreamRequestDurationSeconds.startTimer();
+    return withSpan(
+      "news.upstream.request",
+      {
+        "news.upstream.provider": "gnews",
+        "news.circuit.state": circuitState,
+      },
+      async (span) => {
+        try {
+          const response = await withUpstreamRetries(() =>
+            axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
+              params: toProviderParams(options),
+              timeout: UPSTREAM_TIMEOUT_MS,
+              maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
+              validateStatus: (s) => s >= 200 && s < 300,
+            })
+          );
 
-    try {
-      const response = await withUpstreamRetries(() =>
-        axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
-          params: toProviderParams(options),
-          timeout: UPSTREAM_TIMEOUT_MS,
-          maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
-          validateStatus: (s) => s >= 200 && s < 300,
-        })
-      );
-
-      const articles = normalizeArticles(response.data);
-      upstreamRequestsTotal.inc({ outcome: "success" });
-      stopUpstreamTimer({ outcome: "success" });
-      recordProviderSuccess();
-      return articles;
-    } catch (err) {
-      const outcome =
-        err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
-      upstreamRequestsTotal.inc({ outcome });
-      stopUpstreamTimer({ outcome });
-      if (shouldRecordProviderFailure(err)) {
-        recordProviderFailure();
+          const articles = normalizeArticles(response.data);
+          span.setAttribute("news.upstream.outcome", "success");
+          upstreamRequestsTotal.inc({ outcome: "success" });
+          stopUpstreamTimer({ outcome: "success" });
+          recordProviderSuccess();
+          return articles;
+        } catch (err) {
+          const outcome =
+            err instanceof HttpError && err.statusCode === 502 ? "invalid_payload" : "error";
+          span.setAttribute("news.upstream.outcome", outcome);
+          upstreamRequestsTotal.inc({ outcome });
+          stopUpstreamTimer({ outcome });
+          if (shouldRecordProviderFailure(err)) {
+            recordProviderFailure();
+          }
+          if (axios.isAxiosError(err)) {
+            throw mapAxiosError(err);
+          }
+          throw err;
+        }
       }
-      if (axios.isAxiosError(err)) {
-        throw mapAxiosError(err);
-      }
-      throw err;
-    }
+    );
   }
 }
 

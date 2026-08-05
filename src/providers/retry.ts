@@ -4,6 +4,7 @@ import {
   resolvePositiveIntegerEnv,
 } from "../config/numbers";
 import { upstreamRetriesTotal } from "../metrics/register";
+import { withSpan } from "../tracing";
 
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 500, 502, 503, 504]);
 const RETRYABLE_ERROR_CODES = new Set([
@@ -45,6 +46,19 @@ function sleep(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+function retryReason(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    if (status !== undefined && RETRYABLE_STATUS_CODES.has(status)) {
+      return `http_${status}`;
+    }
+    if (typeof error.code === "string" && RETRYABLE_ERROR_CODES.has(error.code)) {
+      return "network";
+    }
+  }
+  return "transient_error";
+}
+
 export async function withUpstreamRetries<T>(operation: () => Promise<T>): Promise<T> {
   const maxRetries = retryAttempts();
 
@@ -56,7 +70,14 @@ export async function withUpstreamRetries<T>(operation: () => Promise<T>): Promi
         throw error;
       }
       upstreamRetriesTotal.inc();
-      await sleep(retryDelayMs(attempt));
+      await withSpan(
+        "news.upstream.retry",
+        {
+          "news.retry.attempt": attempt + 1,
+          "news.retry.reason": retryReason(error),
+        },
+        () => sleep(retryDelayMs(attempt))
+      );
     }
   }
 }
