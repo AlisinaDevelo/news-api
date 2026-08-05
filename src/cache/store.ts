@@ -8,11 +8,23 @@ const TTL_SEC = 600;
 const DEFAULT_MAX_KEYS = 2_000;
 const ABSOLUTE_MAX_KEYS = 100_000;
 
+const RELEASE_LEASE_SCRIPT = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("del", KEYS[1])
+end
+return 0
+`;
+
+export interface CacheLeaseStore {
+  tryAcquireLease(key: string, owner: string, ttlMs: number): Promise<boolean>;
+  releaseLease(key: string, owner: string): Promise<void>;
+}
+
 export type CacheStore = {
   get(key: string): Promise<unknown | undefined>;
   set(key: string, value: unknown, ttlSec?: number): Promise<void>;
   delete(key: string): Promise<void>;
-};
+} & Partial<CacheLeaseStore>;
 
 let singleton: CacheStore | null = null;
 let redisClient: Redis | null = null;
@@ -123,6 +135,13 @@ function createRedisStore(url: string): CacheStore {
     async delete(key: string) {
       await client.del(key);
     },
+    async tryAcquireLease(key: string, owner: string, ttlMs: number) {
+      const result = await client.set(key, owner, "PX", ttlMs, "NX");
+      return result === "OK";
+    },
+    async releaseLease(key: string, owner: string) {
+      await client.eval(RELEASE_LEASE_SCRIPT, 1, key, owner);
+    },
   };
 }
 
@@ -137,6 +156,13 @@ export function getCacheStore(): CacheStore {
     }
   }
   return singleton;
+}
+
+export function getCacheLeaseStore(store: CacheStore): CacheLeaseStore | undefined {
+  if (typeof store.tryAcquireLease !== "function" || typeof store.releaseLease !== "function") {
+    return undefined;
+  }
+  return store as CacheLeaseStore;
 }
 
 /** @internal tests */

@@ -31,6 +31,13 @@ export const cacheEvictionsTotal = new Counter({
   registers: [register],
 });
 
+export const cacheCoordinationEventsTotal = new Counter({
+  name: "news_cache_coordination_events_total",
+  help: "Total cross-replica cache-miss coordination events by outcome",
+  labelNames: ["event"],
+  registers: [register],
+});
+
 export const rateLimitStoreErrorsTotal = new Counter({
   name: "news_rate_limit_store_errors_total",
   help: "Total rate-limit store errors by source",

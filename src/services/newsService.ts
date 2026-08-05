@@ -1,5 +1,6 @@
 import { isArticleList, type Article } from "../types/article";
 import { CacheCorruptionError, CacheStore, getCacheStore } from "../cache/store";
+import { coordinateCacheMiss } from "../cache/coordinator";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 import { cacheErrorsTotal, cacheEventsTotal } from "../metrics/register";
@@ -185,6 +186,25 @@ async function writeCachedArticles(
 }
 
 async function fetchArticlesFromUpstream(
+  options: ArticleSearchOptions,
+  store: CacheStore,
+  cacheKey: string,
+  signal: AbortSignal
+): Promise<ArticleSearchResult> {
+  const coordinated = await coordinateCacheMiss({
+    store,
+    cacheKey,
+    signal,
+    readFresh: () => readCachedArticles(store, cacheKey),
+    load: () => loadArticlesFromUpstream(options, store, cacheKey, signal),
+  });
+  if (coordinated.source === "shared-cache") {
+    return { ...coordinated.value, cache: "coalesced" };
+  }
+  return coordinated.value;
+}
+
+async function loadArticlesFromUpstream(
   options: ArticleSearchOptions,
   store: CacheStore,
   cacheKey: string,
