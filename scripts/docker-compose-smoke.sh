@@ -7,7 +7,12 @@ BASE_URL="${BASE_URL:-http://127.0.0.1:3000}"
 RATE_LIMIT_A_URL="${RATE_LIMIT_A_URL:-http://127.0.0.1:3001}"
 RATE_LIMIT_B_URL="${RATE_LIMIT_B_URL:-http://127.0.0.1:3002}"
 RATE_LIMIT_CLIENT_IP="${RATE_LIMIT_CLIENT_IP:-198.51.100.42}"
+FAKE_GNEWS_URL="${FAKE_GNEWS_URL:-http://127.0.0.1:4010}"
 RATE_LIMIT_BODY="$(mktemp)"
+CACHE_COORDINATION_BODY_A="$(mktemp)"
+CACHE_COORDINATION_BODY_B="$(mktemp)"
+CACHE_COORDINATION_STATUS_A="$(mktemp)"
+CACHE_COORDINATION_STATUS_B="$(mktemp)"
 
 cleanup() {
   status=$?
@@ -15,7 +20,7 @@ cleanup() {
     docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" logs --no-color || true
   fi
   docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" down -v --remove-orphans || true
-  rm -f "$RATE_LIMIT_BODY"
+  rm -f "$RATE_LIMIT_BODY" "$CACHE_COORDINATION_BODY_A" "$CACHE_COORDINATION_BODY_B" "$CACHE_COORDINATION_STATUS_A" "$CACHE_COORDINATION_STATUS_B"
   exit "$status"
 }
 
@@ -78,5 +83,44 @@ if ! grep -q 'rate_limit_exceeded' "$RATE_LIMIT_BODY"; then
   exit 1
 fi
 echo "OK   shared rate limit second replica (429)"
+
+cache_stats() {
+  node -e 'fetch(process.argv[1] + "/stats").then((response) => response.json()).then((body) => process.stdout.write(String(body.searchRequests))).catch(() => process.exit(1))' "$FAKE_GNEWS_URL"
+}
+
+CACHE_COORDINATION_QUERY="compose-cache-coordination-$(date +%s)-$$"
+CACHE_COORDINATION_PATH="/api/v1/articles?query=$CACHE_COORDINATION_QUERY&count=1"
+CACHE_COORDINATION_BEFORE="$(cache_stats)"
+
+curl -sS \
+  -H "X-Forwarded-For: 198.51.100.43" \
+  -o "$CACHE_COORDINATION_BODY_A" \
+  -w "%{http_code}" \
+  "$RATE_LIMIT_A_URL$CACHE_COORDINATION_PATH" >"$CACHE_COORDINATION_STATUS_A" &
+CACHE_COORDINATION_PID_A=$!
+curl -sS \
+  -H "X-Forwarded-For: 198.51.100.44" \
+  -o "$CACHE_COORDINATION_BODY_B" \
+  -w "%{http_code}" \
+  "$RATE_LIMIT_B_URL$CACHE_COORDINATION_PATH" >"$CACHE_COORDINATION_STATUS_B" &
+CACHE_COORDINATION_PID_B=$!
+
+wait "$CACHE_COORDINATION_PID_A"
+wait "$CACHE_COORDINATION_PID_B"
+CACHE_COORDINATION_STATUS_VALUE_A="$(cat "$CACHE_COORDINATION_STATUS_A")"
+CACHE_COORDINATION_STATUS_VALUE_B="$(cat "$CACHE_COORDINATION_STATUS_B")"
+if [ "$CACHE_COORDINATION_STATUS_VALUE_A" != "200" ] || [ "$CACHE_COORDINATION_STATUS_VALUE_B" != "200" ]; then
+  echo "FAIL cross-replica cache coordination: expected two HTTP 200 responses, got $CACHE_COORDINATION_STATUS_VALUE_A and $CACHE_COORDINATION_STATUS_VALUE_B"
+  cat "$CACHE_COORDINATION_BODY_A" "$CACHE_COORDINATION_BODY_B"
+  exit 1
+fi
+
+CACHE_COORDINATION_AFTER="$(cache_stats)"
+CACHE_COORDINATION_EXPECTED=$((CACHE_COORDINATION_BEFORE + 1))
+if [ "$CACHE_COORDINATION_AFTER" -ne "$CACHE_COORDINATION_EXPECTED" ]; then
+  echo "FAIL cross-replica cache coordination: expected one fake-provider call ($CACHE_COORDINATION_EXPECTED), got $CACHE_COORDINATION_AFTER"
+  exit 1
+fi
+echo "OK   cross-replica cache coordination (one upstream call)"
 
 BASE_URL="$BASE_URL" QUERY="${QUERY:-ci-smoke}" COUNT="${COUNT:-3}" PAGE="${PAGE:-2}" npm run smoke

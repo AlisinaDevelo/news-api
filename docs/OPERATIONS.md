@@ -15,6 +15,9 @@
 | `UPSTREAM_RETRY_BASE_DELAY_MS` | `100` | Initial exponential retry delay with jitter (maximum `2000`). |
 | `STALE_CACHE_TTL_SEC` | `3600` | Longer-lived stale article cache TTL used only as an upstream-failure fallback (min effective value `>600`, max `86400`). |
 | `CACHE_MAX_KEYS` | `2000` | Maximum number of keys held by the in-process cache. Fresh and stale entries both count; when full, the least-recently-used entry is evicted. Values above `100000` are clamped. Ignored when `REDIS_URL` is set. |
+| `CACHE_LEASE_TTL_MS` | `5000` | Redis cache-miss lease lifetime. Values above `30000` are clamped; only active when `REDIS_URL` is set. |
+| `CACHE_LEASE_WAIT_MS` | `750` | Maximum time a replica waits for another replica to fill a fresh cache key before fetching upstream. Values above `5000` are clamped. |
+| `CACHE_LEASE_POLL_MS` | `50` | Base Redis/cache recheck interval while waiting for a shared miss. Values above `500` are clamped and jitter is applied. |
 | `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Positive integer number of consecutive provider failures before the circuit opens; invalid values fall back to `3`. |
 | `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). Only one recovery probe is allowed after cooldown. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
@@ -50,7 +53,7 @@ with documented maximums are clamped.
 ## Scaling and cache
 
 - **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL, bounded to `CACHE_MAX_KEYS` entries with least-recently-used eviction). Each replica has its own entries. Fresh and stale keys share this capacity; expired entries are removed on access and new writes evict the oldest live entry when needed.
-- **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
+- **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries. Cold misses also use a short owner-token lease (`SET NX PX`) and bounded cache rechecks to reduce duplicate GNews calls across replicas. Lease expiry and Redis lease errors fail open to the upstream path; they do not make article requests fail by themselves.
 - **Rate limits with `REDIS_URL`:** `rate-limit-redis` shares the quota across instances under the `news-api:rate-limit:` prefix. The limiter uses a separate Redis connection and fails closed with structured `503` errors if its store is unavailable.
 - **Rate limits without `REDIS_URL`:** the built-in memory store protects each process independently; it does not provide cross-replica quota consistency.
 - Cache keys include normalized search parameters: query, count, page, `lang`, `country`, `from`, `to`, and `sortBy`.
@@ -62,6 +65,7 @@ with documented maximums are clamped.
 - Provider `429` responses return `429` with code `upstream_rate_limited`; provider `503` responses return `503` with code `upstream_unavailable`. A valid provider `Retry-After` value is normalized to delta-seconds and capped at 86400 seconds, while arbitrary upstream headers are never forwarded.
 - The circuit breaker counts network failures, `408`, `425`, `429`, and 5xx responses; permanent 4xx responses remain visible as upstream errors without opening the circuit.
 - Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
+- Redis-backed replicas coordinate the same normalized miss with a bounded lease. The winner rechecks the cache after acquiring the lease, writes the fresh result, and releases only its owner token; waiters return the shared cache value when it appears. A waiter deadline can permit duplicate upstream work, preserving availability over indefinite lock contention.
 - If a client disconnects before its response ends, its waiter is canceled and `news_request_cancellations_total` increments. Coalesced upstream work continues for remaining waiters; when no waiters remain, the provider request and retry delay are aborted. Canceled work is not retried, counted as a circuit failure, or converted into stale fallback.
 - Successful searches are also written to a longer-lived stale cache key. If a later fresh miss hits an upstream failure and stale data is available, `/api/v1/*` returns `meta.cache=stale` and `X-Cache-Status: stale` with a `200` response instead of surfacing the provider outage.
 
@@ -94,6 +98,7 @@ approximately ten-percent trace sample while preserving parent decisions.
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale|delete|delete_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, skipping stale fallback, or failing to quarantine a corrupt entry. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |
+| `news_cache_coordination_events_total` | `event=acquired|waited|hit|bypassed|expired|error|released|release_error` | Cross-replica Redis cache-miss lease outcomes. |
 | `news_rate_limit_store_errors_total` | `source=request|lifecycle|connection` | Rate-limit Redis/store failures; the request path fails closed with `503`. |
 | `news_request_cancellations_total` | `reason=client_disconnect` | Downstream requests that disconnected before their response completed. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload|canceled|timeout` | GNews provider request outcomes. |
@@ -101,7 +106,7 @@ approximately ten-percent trace sample while preserving parent decisions.
 | `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload|canceled|timeout` | GNews provider request latency histogram. |
 | `news_upstream_circuit_events_total` | `event=opened|short_circuit|half_open|closed` | Provider circuit breaker state transitions and short-circuited requests. |
 
-Use cache hit rate and coalesced miss counts to understand quota protection, cancellation counts to spot client churn or upstream latency pressure, stale counts to see when provider trouble is being hidden by cached data, cache error metrics to detect Redis/backend trouble, upstream latency/error metrics to separate provider trouble from local API trouble, and circuit events to see when repeated provider failures are being shed locally.
+Use cache hit rate, coalesced miss counts, and coordination events to understand quota protection across replicas, cancellation counts to spot client churn or upstream latency pressure, stale counts to see when provider trouble is being hidden by cached data, cache error and lease error metrics to detect Redis/backend trouble, upstream latency/error metrics to separate provider trouble from local API trouble, and circuit events to see when repeated provider failures are being shed locally.
 
 ## Docker
 

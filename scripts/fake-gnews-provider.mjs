@@ -2,6 +2,7 @@ import http from "node:http";
 
 const port = Number(process.env.PORT ?? 4010);
 const delayMs = Number(process.env.FAKE_GNEWS_DELAY_MS ?? 0);
+let searchRequests = 0;
 
 function articleFor(query, index) {
   return {
@@ -31,12 +32,18 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === "/stats") {
+    sendJson(res, 200, { searchRequests });
+    return;
+  }
+
   if (url.pathname !== "/search") {
     sendJson(res, 404, { error: "not found" });
     return;
   }
 
   const query = url.searchParams.get("q") ?? "news";
+  searchRequests += 1;
   const count = Math.max(1, Math.min(Number(url.searchParams.get("max") ?? 3), 100));
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
   const offset = (page - 1) * count;

@@ -9,11 +9,13 @@ services:
 
   fake-gnews:
     image: node:22-alpine
+    ports:
+      - "4010:4010"
     working_dir: /app
     command: ["node", "/app/scripts/fake-gnews-provider.mjs"]
     environment:
       PORT: "4010"
-      FAKE_GNEWS_DELAY_MS: "5"
+      FAKE_GNEWS_DELAY_MS: "250"
     volumes:
       - ./scripts:/app/scripts:ro
     healthcheck:
