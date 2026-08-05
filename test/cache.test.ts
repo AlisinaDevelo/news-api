@@ -28,9 +28,21 @@ describe("cache", () => {
       async set() {
         return undefined;
       },
+      async delete() {
+        return undefined;
+      },
     });
 
     expect(await getCacheStore().get("anything")).toEqual(value);
+  });
+
+  it("deletes a memory cache entry", async () => {
+    const store = getCacheStore();
+    await store.set("remove-me", { cached: true });
+
+    await store.delete("remove-me");
+
+    expect(await store.get("remove-me")).toBeUndefined();
   });
 
   it("rejects corrupted Redis JSON instead of treating it as a miss", () => {

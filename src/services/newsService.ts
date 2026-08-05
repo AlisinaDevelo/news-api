@@ -1,5 +1,5 @@
 import { isArticleList, type Article } from "../types/article";
-import { CacheStore, getCacheStore } from "../cache/store";
+import { CacheCorruptionError, CacheStore, getCacheStore } from "../cache/store";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { ArticleSearchFilters, ArticleSearchOptions } from "../types/search";
 import { cacheErrorsTotal, cacheEventsTotal } from "../metrics/register";
@@ -42,20 +42,29 @@ async function readCachedArticles(
   store: CacheStore,
   cacheKey: string
 ): Promise<ArticleSearchResult | undefined> {
+  let cached: unknown | undefined;
   try {
-    const cached = await store.get(cacheKey);
-    if (cached !== undefined) {
-      if (!isArticleList(cached)) {
-        throw new Error("invalid cached article payload");
-      }
-      cacheEventsTotal.inc({ result: "hit" });
-      return { articles: cached, cache: "hit" };
-    }
+    cached = await store.get(cacheKey);
   } catch (err) {
     cacheEventsTotal.inc({ result: "error" });
     cacheErrorsTotal.inc({ operation: "get" });
     logger.warn({ err }, "cache get failed; falling through to upstream");
+    if (err instanceof CacheCorruptionError) {
+      await deleteCorruptCacheEntry(store, cacheKey, "delete");
+    }
     return undefined;
+  }
+
+  if (cached !== undefined) {
+    if (!isArticleList(cached)) {
+      cacheEventsTotal.inc({ result: "error" });
+      cacheErrorsTotal.inc({ operation: "get" });
+      logger.warn({ err: new Error("invalid cached article payload") }, "cache payload is invalid");
+      await deleteCorruptCacheEntry(store, cacheKey, "delete");
+      return undefined;
+    }
+    cacheEventsTotal.inc({ result: "hit" });
+    return { articles: cached, cache: "hit" };
   }
 
   cacheEventsTotal.inc({ result: "miss" });
@@ -66,21 +75,47 @@ async function readStaleCachedArticles(
   store: CacheStore,
   cacheKey: string
 ): Promise<ArticleSearchResult | undefined> {
+  const staleKey = staleCacheKey(cacheKey);
+  let cached: unknown | undefined;
   try {
-    const cached = await store.get(staleCacheKey(cacheKey));
-    if (cached !== undefined) {
-      if (!isArticleList(cached)) {
-        throw new Error("invalid stale cached article payload");
-      }
-      cacheEventsTotal.inc({ result: "stale" });
-      return { articles: cached, cache: "stale" };
-    }
+    cached = await store.get(staleKey);
   } catch (err) {
     cacheErrorsTotal.inc({ operation: "get_stale" });
     logger.warn({ err }, "stale cache get failed; returning upstream error");
+    if (err instanceof CacheCorruptionError) {
+      await deleteCorruptCacheEntry(store, staleKey, "delete_stale");
+    }
+    return undefined;
+  }
+
+  if (cached !== undefined) {
+    if (!isArticleList(cached)) {
+      cacheErrorsTotal.inc({ operation: "get_stale" });
+      logger.warn(
+        { err: new Error("invalid stale cached article payload") },
+        "stale cache payload is invalid"
+      );
+      await deleteCorruptCacheEntry(store, staleKey, "delete_stale");
+      return undefined;
+    }
+    cacheEventsTotal.inc({ result: "stale" });
+    return { articles: cached, cache: "stale" };
   }
 
   return undefined;
+}
+
+async function deleteCorruptCacheEntry(
+  store: CacheStore,
+  key: string,
+  operation: "delete" | "delete_stale"
+): Promise<void> {
+  try {
+    await store.delete(key);
+  } catch (err) {
+    cacheErrorsTotal.inc({ operation });
+    logger.warn({ err }, "cache corruption quarantine failed; continuing without cache entry");
+  }
 }
 
 async function writeCachedArticles(

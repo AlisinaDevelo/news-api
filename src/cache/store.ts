@@ -11,6 +11,7 @@ const ABSOLUTE_MAX_KEYS = 100_000;
 export type CacheStore = {
   get(key: string): Promise<unknown | undefined>;
   set(key: string, value: unknown, ttlSec?: number): Promise<void>;
+  delete(key: string): Promise<void>;
 };
 
 let singleton: CacheStore | null = null;
@@ -76,14 +77,25 @@ function createMemoryStore(): CacheStore {
       c.set(key, value, ttlSec);
       touch(key);
     },
+    async delete(key: string) {
+      c.del(key);
+      recency.delete(key);
+    },
   };
+}
+
+export class CacheCorruptionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CacheCorruptionError";
+  }
 }
 
 export function parseRedisCacheValue(raw: string): unknown {
   try {
     return JSON.parse(raw) as unknown;
   } catch {
-    throw new Error("invalid JSON in Redis cache entry");
+    throw new CacheCorruptionError("invalid JSON in Redis cache entry");
   }
 }
 
@@ -107,6 +119,9 @@ function createRedisStore(url: string): CacheStore {
     },
     async set(key: string, value: unknown, ttlSec = TTL_SEC) {
       await client.setex(key, ttlSec, JSON.stringify(value));
+    },
+    async delete(key: string) {
+      await client.del(key);
     },
   };
 }

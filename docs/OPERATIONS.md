@@ -50,7 +50,7 @@ with documented maximums are clamped.
 - **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL, bounded to `CACHE_MAX_KEYS` entries with least-recently-used eviction). Each replica has its own entries. Fresh and stale keys share this capacity; expired entries are removed on access and new writes evict the oldest live entry when needed.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
 - Cache keys include normalized search parameters: query, count, page, `lang`, `country`, `from`, `to`, and `sortBy`.
-- Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, contains malformed Redis JSON, or contains a value that is not a valid article array, the service logs a warning, increments cache error metrics, falls through to GNews on read failure, and still returns the upstream response on write failure.
+- Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, contains malformed Redis JSON, or contains a value that is not a valid article array, the service logs a warning, increments cache error metrics, deletes the corrupt key on a best-effort basis, falls through to GNews on read failure, and still returns the upstream response on write failure.
 - Provider payloads with more than `100` articles are rejected as invalid so an upstream response cannot bypass the API's bounded collection contract.
 - The GNews client rejects response bodies larger than `5 MiB` before the payload reaches application validation.
 - Transient network/timeout and 5xx provider failures are retried with bounded exponential backoff and jitter. `429` and other 4xx responses, invalid payloads, and internal errors are not retried.
@@ -69,7 +69,7 @@ On shutdown the server closes the Redis connection when that backend was used.
 |--------|--------|---------|
 | `http_requests_total` | `method`, `status_code` | HTTP response count. |
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
-| `news_cache_errors_total` | `operation=get|set|get_stale|set_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, or skipping stale fallback. |
+| `news_cache_errors_total` | `operation=get|set|get_stale|set_stale|delete|delete_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, skipping stale fallback, or failing to quarantine a corrupt entry. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
 | `news_upstream_retries_total` | — | Transient upstream retry attempts. |

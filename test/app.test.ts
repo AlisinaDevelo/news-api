@@ -20,6 +20,7 @@ import axios from "axios";
 import app from "../src/app";
 import { sampleArticles } from "./fixtures/articles";
 import {
+  CacheCorruptionError,
   getCacheStore,
   resetCacheStoreForTests,
   setCacheStoreForTests,
@@ -299,6 +300,9 @@ describe("app", () => {
       async set() {
         return undefined;
       },
+      async delete() {
+        return undefined;
+      },
     });
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
 
@@ -311,12 +315,16 @@ describe("app", () => {
   });
 
   it("falls through when the cache payload has an invalid article shape", async () => {
+    const deletedKeys: string[] = [];
     setCacheStoreForTests({
       async get() {
         return { invalid: true };
       },
       async set() {
         return undefined;
+      },
+      async delete(key) {
+        deletedKeys.push(key);
       },
     });
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
@@ -327,6 +335,51 @@ describe("app", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual(sampleArticles);
     expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(deletedKeys).toHaveLength(1);
+  });
+
+  it("deletes malformed Redis JSON before falling through to upstream", async () => {
+    const deletedKeys: string[] = [];
+    setCacheStoreForTests({
+      async get() {
+        throw new CacheCorruptionError("invalid JSON in Redis cache entry");
+      },
+      async set() {
+        return undefined;
+      },
+      async delete(key) {
+        deletedKeys.push(key);
+      },
+    });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    const q = `cache-invalid-json-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+
+    expect(res.status).toBe(200);
+    expect(deletedKeys).toHaveLength(1);
+  });
+
+  it("keeps requests healthy when cache quarantine deletion fails", async () => {
+    setCacheStoreForTests({
+      async get() {
+        return { invalid: true };
+      },
+      async set() {
+        return undefined;
+      },
+      async delete() {
+        throw new Error("cache delete failed");
+      },
+    });
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    const q = `cache-delete-fails-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app).get(`/api/articles?query=${encodeURIComponent(q)}&count=2`);
+    const metrics = await request(app).get("/metrics");
+
+    expect(res.status).toBe(200);
+    expect(metrics.text).toContain('news_cache_errors_total{operation="delete"}');
   });
 
   it("returns upstream response when cache set fails", async () => {
@@ -336,6 +389,9 @@ describe("app", () => {
       },
       async set() {
         throw new Error("cache write failed");
+      },
+      async delete() {
+        return undefined;
       },
     });
     mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
@@ -357,6 +413,9 @@ describe("app", () => {
       async set() {
         return undefined;
       },
+      async delete() {
+        return undefined;
+      },
     });
     mockGet.mockRejectedValueOnce(new axios.AxiosError("timeout"));
 
@@ -372,12 +431,16 @@ describe("app", () => {
   });
 
   it("does not serve a structurally invalid stale cache payload", async () => {
+    const deletedKeys: string[] = [];
     setCacheStoreForTests({
       async get(key) {
         return key.endsWith(":stale") ? { invalid: true } : undefined;
       },
       async set() {
         return undefined;
+      },
+      async delete(key) {
+        deletedKeys.push(key);
       },
     });
     mockGet.mockRejectedValueOnce(new axios.AxiosError("timeout"));
@@ -387,6 +450,8 @@ describe("app", () => {
 
     expect(res.status).toBe(502);
     expect(res.body.error).toMatchObject({ code: "upstream_unavailable" });
+    expect(deletedKeys).toHaveLength(1);
+    expect(deletedKeys[0]).toMatch(/:stale$/);
   });
 
   it("coalesces identical in-flight cache misses", async () => {
