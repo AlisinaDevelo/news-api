@@ -15,7 +15,7 @@ services:
     command: ["node", "/app/scripts/fake-gnews-provider.mjs"]
     environment:
       PORT: "4010"
-      FAKE_GNEWS_DELAY_MS: "250"
+      FAKE_GNEWS_DELAY_MS: "1200"
     volumes:
       - ./scripts:/app/scripts:ro
     healthcheck:
@@ -41,6 +41,9 @@ services:
       DISABLE_RATE_LIMIT: "1"
       LOG_LEVEL: silent
       REDIS_URL: redis://redis:6379
+      CACHE_LEASE_TTL_MS: "400"
+      CACHE_LEASE_HEARTBEAT_MS: "200"
+      CACHE_LEASE_WAIT_MS: "1500"
 
   rate-limit-a:
     build: .
@@ -61,6 +64,9 @@ services:
       TRUST_PROXY: "1"
       LOG_LEVEL: silent
       REDIS_URL: redis://redis:6379
+      CACHE_LEASE_TTL_MS: "400"
+      CACHE_LEASE_HEARTBEAT_MS: "200"
+      CACHE_LEASE_WAIT_MS: "1500"
 
   rate-limit-b:
     build: .
@@ -81,3 +87,6 @@ services:
       TRUST_PROXY: "1"
       LOG_LEVEL: silent
       REDIS_URL: redis://redis:6379
+      CACHE_LEASE_TTL_MS: "400"
+      CACHE_LEASE_HEARTBEAT_MS: "200"
+      CACHE_LEASE_WAIT_MS: "1500"

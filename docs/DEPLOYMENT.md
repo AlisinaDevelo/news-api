@@ -17,6 +17,7 @@ Set these variables on the hosting platform:
 | `CLIENT_API_KEYS` | generated secret | Recommended for a public demo; protects `/api/*`. |
 | `REDIS_URL` | managed Redis URL | Optional. Use it if the platform makes Redis cheap/easy. |
 | `CACHE_LEASE_TTL_MS` | `5000` | Short cross-replica cache-miss lease; only active with managed Redis. |
+| `CACHE_LEASE_HEARTBEAT_MS` | half of lease TTL | Owner-checked renewal interval for slow provider work. |
 | `CACHE_LEASE_WAIT_MS` | `750` | Bounded wait for another replica to populate the shared cache. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Graceful drain deadline; give the platform a longer termination grace period. |
 | `UPSTREAM_TOTAL_TIMEOUT_MS` | `60000` | Total provider budget across retries; keep it below the platform request timeout. |
