@@ -103,6 +103,21 @@ Successful upstream searches write both a fresh cache key and a longer-lived sta
 
 The GNews provider adapter tracks consecutive provider failures. After `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` failures, it opens a cooldown window (`UPSTREAM_CIRCUIT_COOLDOWN_MS`) and returns `503` without making another upstream call. After the cooldown, exactly one request is allowed through as the half-open recovery probe; concurrent callers remain short-circuited until that probe succeeds or fails. Success closes the circuit, while another failure opens it again.
 
+## Tracing
+
+Automatic OpenTelemetry HTTP/Express instrumentation provides request-level spans when an OTLP
+exporter is configured. Manual domain spans add the useful application decisions beneath those
+requests: `news.search`, `news.cache.lookup`, `news.cache.write`, `news.cache.stale_fallback`,
+`news.upstream.circuit`, `news.upstream.request`, and `news.upstream.retry`. Span names and
+attributes use bounded operation, state, outcome, provider, and retry values; query strings,
+API keys, raw provider URLs, article content, and exception messages are intentionally excluded.
+
+Tracing is optional and safe without a collector because the OpenTelemetry API uses no-op spans
+until the SDK is enabled. Sampling remains an SDK/deployment decision; use the standard
+`OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG` environment variables when a high-volume
+deployment needs a lower trace rate. The deterministic exporter tests in `test/tracing.test.ts`
+protect the span names, bounded attributes, and PII boundary.
+
 ## Metrics
 
 `src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts, while `newsService` and the provider adapter record cache hits/misses/errors/coalesced/stale misses, upstream request outcomes, upstream latency buckets, and circuit breaker events.

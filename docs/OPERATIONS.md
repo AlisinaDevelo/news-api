@@ -67,6 +67,19 @@ the library's IPv6 `/56` key policy, and sends `Retry-After` when a quota is exc
 
 On shutdown the server closes the cache and rate-limit Redis connections when those backends were used.
 
+## Tracing
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` to enable OTLP export.
+The service starts automatic HTTP/Express instrumentation before the application loads and adds
+domain spans for search, cache lookup/write, upstream requests and retries, circuit decisions,
+and stale fallback. These spans use fixed names and bounded outcome/state attributes. Query text,
+API keys, raw provider URLs, article content, and exception messages are not recorded.
+
+The OpenTelemetry SDK honors the standard `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG`
+settings, so production sampling can be tuned without changing the service. For example,
+`OTEL_TRACES_SAMPLER=parentbased_traceidratio` with `OTEL_TRACES_SAMPLER_ARG=0.1` keeps an
+approximately ten-percent trace sample while preserving parent decisions.
+
 ## Metrics
 
 `GET /metrics` exposes default Node.js process metrics plus application metrics:
