@@ -39,7 +39,8 @@ with documented maximums are clamped.
 ## Probes
 
 - **Liveness:** `GET /health` — process is up.
-- **Readiness:** `GET /ready` — `200` when `GNEWS_API_KEY` is set (non-test); `503` if not.
+- **Readiness:** `GET /ready` — `200` when `GNEWS_API_KEY` is set and the process is serving; `503` with
+  `status=not_ready` when the key is missing or `status=draining` after shutdown begins.
 
 ## API contract
 
@@ -160,4 +161,13 @@ Logs are **JSON** (Pino). Each response includes an `x-request-id` header for co
 
 ## Graceful shutdown
 
-The process closes the HTTP server on `SIGTERM` / `SIGINT` before exit. Orchestrators should use termination grace periods longer than `SHUTDOWN_TIMEOUT_MS`.
+The first `SIGTERM` / `SIGINT` marks the process as draining, so `/ready` returns `503` and an
+orchestrator can remove the replica from service while `/health` remains `200`. The process then
+closes the HTTP server and allows active requests to finish. The existing `SHUTDOWN_TIMEOUT_MS`
+setting is the single deadline; its expiry aborts outbound provider work, force-closes remaining
+HTTP connections, and exits with status `1`.
+
+Signal handling is idempotent because container lifecycle hooks and signals can be repeated. Set a
+Kubernetes `terminationGracePeriodSeconds` longer than `SHUTDOWN_TIMEOUT_MS`; a short `preStop`
+delay is optional when the platform needs time to propagate readiness removal. Docker sends the
+same `SIGTERM` path when `docker stop` is used with the exec-form image command.

@@ -13,6 +13,7 @@ import { metricsRequestObserver } from "./middleware/metricsHttp";
 import { clientApiKeyGate } from "./middleware/clientApiKey";
 import { register as metricsRegister } from "./metrics/register";
 import { DEFAULT_COMPRESSION_THRESHOLD_BYTES } from "./constants";
+import { isDraining } from "./runtime/lifecycle";
 
 const openApiFile = path.resolve(process.cwd(), "docs", "openapi.yaml");
 
@@ -31,6 +32,10 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/ready", (_req, res) => {
+  if (isDraining()) {
+    res.status(503).json({ status: "draining" });
+    return;
+  }
   if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
     res.json({ status: "ready" });
     return;

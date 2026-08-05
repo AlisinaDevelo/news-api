@@ -27,6 +27,7 @@ import {
 } from "../src/cache/store";
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../src/constants";
+import { beginDraining, resetLifecycleForTests } from "../src/runtime/lifecycle";
 
 function axiosErrorWithStatus(
   status: number,
@@ -42,6 +43,7 @@ describe("app", () => {
     mockGet.mockReset();
     resetCacheStoreForTests();
     resetGNewsCircuitForTests();
+    resetLifecycleForTests();
   });
 
   it("GET /health returns ok", async () => {
@@ -55,6 +57,20 @@ describe("app", () => {
     const res = await request(app).get("/ready");
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "ready" });
+  });
+
+  it("reports draining readiness while keeping liveness available", async () => {
+    beginDraining();
+
+    const [ready, health] = await Promise.all([
+      request(app).get("/ready"),
+      request(app).get("/health"),
+    ]);
+
+    expect(ready.status).toBe(503);
+    expect(ready.body).toEqual({ status: "draining" });
+    expect(health.status).toBe(200);
+    expect(health.body).toMatchObject({ status: "ok" });
   });
 
   it("GET /openapi.yaml serves spec", async () => {

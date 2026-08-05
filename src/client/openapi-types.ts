@@ -48,7 +48,7 @@ export interface paths {
         };
         /**
          * Readiness probe
-         * @description Returns 503 when `GNEWS_API_KEY` is not configured (non-test environments).
+         * @description Returns 503 when the API key is missing or the process is draining during shutdown.
          */
         get: operations["getReady"];
         put?: never;
@@ -261,8 +261,18 @@ export interface components {
         NotReadyResponse: {
             /** @example not_ready */
             status: string;
-            /** @example missing_api_key */
-            reason: string;
+            /**
+             * @example missing_api_key
+             * @enum {string}
+             */
+            reason: "missing_api_key";
+        };
+        DrainingResponse: {
+            /**
+             * @example draining
+             * @enum {string}
+             */
+            status: "draining";
         };
         ArticleSource: {
             name: string;
@@ -524,13 +534,13 @@ export interface operations {
                     "application/json": components["schemas"]["ReadyResponse"];
                 };
             };
-            /** @description Not ready (e.g. missing API key) */
+            /** @description Not ready because the API key is missing or shutdown is draining traffic */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotReadyResponse"];
+                    "application/json": components["schemas"]["NotReadyResponse"] | components["schemas"]["DrainingResponse"];
                 };
             };
         };
