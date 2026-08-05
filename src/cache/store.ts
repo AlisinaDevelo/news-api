@@ -15,9 +15,17 @@ end
 return 0
 `;
 
+const RENEW_LEASE_SCRIPT = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("pexpire", KEYS[1], ARGV[2])
+end
+return 0
+`;
+
 export interface CacheLeaseStore {
   tryAcquireLease(key: string, owner: string, ttlMs: number): Promise<boolean>;
   releaseLease(key: string, owner: string): Promise<void>;
+  renewLease?(key: string, owner: string, ttlMs: number): Promise<boolean>;
 }
 
 export type CacheStore = {
@@ -141,6 +149,10 @@ function createRedisStore(url: string): CacheStore {
     },
     async releaseLease(key: string, owner: string) {
       await client.eval(RELEASE_LEASE_SCRIPT, 1, key, owner);
+    },
+    async renewLease(key: string, owner: string, ttlMs: number) {
+      const result = await client.eval(RENEW_LEASE_SCRIPT, 1, key, owner, ttlMs);
+      return Number(result) === 1;
     },
   };
 }

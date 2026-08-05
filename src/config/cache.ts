@@ -6,6 +6,7 @@ export const DEFAULT_CACHE_LEASE_WAIT_MS = 750;
 export const MAX_CACHE_LEASE_WAIT_MS = 5_000;
 export const DEFAULT_CACHE_LEASE_POLL_MS = 50;
 export const MAX_CACHE_LEASE_POLL_MS = 500;
+export const MAX_CACHE_LEASE_HEARTBEAT_MS = 15_000;
 
 export function resolveCacheLeaseTtlMs(rawValue = process.env.CACHE_LEASE_TTL_MS): number {
   return resolvePositiveIntegerEnv(rawValue, DEFAULT_CACHE_LEASE_TTL_MS, MAX_CACHE_LEASE_TTL_MS);
@@ -25,4 +26,13 @@ export function resolveCacheLeasePollMs(rawValue = process.env.CACHE_LEASE_POLL_
     DEFAULT_CACHE_LEASE_POLL_MS,
     MAX_CACHE_LEASE_POLL_MS
   );
+}
+
+export function resolveCacheLeaseHeartbeatMs(
+  rawValue = process.env.CACHE_LEASE_HEARTBEAT_MS,
+  leaseTtlMs = resolveCacheLeaseTtlMs()
+): number {
+  const maximum = Math.min(MAX_CACHE_LEASE_HEARTBEAT_MS, Math.max(1, Math.floor(leaseTtlMs / 2)));
+  const fallback = Math.max(1, Math.floor(leaseTtlMs / 2));
+  return Math.min(resolvePositiveIntegerEnv(rawValue, fallback, maximum), maximum);
 }

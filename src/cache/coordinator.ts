@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { resolveCacheLeasePollMs, resolveCacheLeaseTtlMs, resolveCacheLeaseWaitMs } from "../config/cache";
+import {
+  resolveCacheLeaseHeartbeatMs,
+  resolveCacheLeasePollMs,
+  resolveCacheLeaseTtlMs,
+  resolveCacheLeaseWaitMs,
+} from "../config/cache";
 import { cacheCoordinationEventsTotal } from "../metrics/register";
 import { RequestAbortedError, throwIfAborted } from "../runtime/requestCancellation";
 import { CacheStore, getCacheLeaseStore } from "./store";
@@ -69,6 +74,58 @@ async function releaseLease(
   }
 }
 
+function startLeaseHeartbeat(
+  store: ReturnType<typeof getCacheLeaseStore>,
+  key: string,
+  owner: string,
+  ttlMs: number,
+  signal?: AbortSignal
+): { stop(): void } {
+  if (!store?.renewLease) {
+    return { stop() {} };
+  }
+
+  let stopped = false;
+  let renewalInFlight = false;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const stop = (): void => {
+    stopped = true;
+    if (timer) {
+      clearInterval(timer);
+      timer = undefined;
+    }
+  };
+  const renew = async (): Promise<void> => {
+    if (stopped || signal?.aborted || renewalInFlight) {
+      return;
+    }
+    renewalInFlight = true;
+    try {
+      const renewed = await store.renewLease?.(key, owner, ttlMs);
+      if (stopped) {
+        return;
+      }
+      if (renewed) {
+        cacheCoordinationEventsTotal.inc({ event: "renewed" });
+      } else {
+        cacheCoordinationEventsTotal.inc({ event: "lost" });
+        stop();
+      }
+    } catch {
+      if (!stopped) {
+        cacheCoordinationEventsTotal.inc({ event: "renewal_error" });
+      }
+    } finally {
+      renewalInFlight = false;
+    }
+  };
+  timer = setInterval(() => {
+    void renew();
+  }, resolveCacheLeaseHeartbeatMs(undefined, ttlMs));
+  timer.unref?.();
+  return { stop };
+}
+
 export async function coordinateCacheMiss<T>(
   options: CacheMissCoordinationOptions<T>
 ): Promise<CacheMissCoordinationResult<T>> {
@@ -112,7 +169,12 @@ export async function coordinateCacheMiss<T>(
           }
           cacheCoordinationEventsTotal.inc({ event: "error" });
         }
-        return { value: await options.load(), source: "upstream" };
+        const heartbeat = startLeaseHeartbeat(leaseStore, key, owner, leaseTtlMs, options.signal);
+        try {
+          return { value: await options.load(), source: "upstream" };
+        } finally {
+          heartbeat.stop();
+        }
       } finally {
         await releaseLease(leaseStore, key, owner);
       }

@@ -3,6 +3,10 @@ import {
   resolveNonNegativeIntegerEnv,
   resolvePositiveIntegerEnv,
 } from "../src/config/numbers";
+import {
+  resolveCacheLeaseHeartbeatMs,
+  resolveCacheLeaseTtlMs,
+} from "../src/config/cache";
 
 describe("resolvePositiveIntegerEnv", () => {
   it("uses the fallback for missing, malformed, or non-positive values", () => {
@@ -28,5 +32,19 @@ describe("resolvePositiveIntegerEnv", () => {
     expect(resolveNonNegativeIntegerEnv("", 1, 3)).toBe(1);
     expect(resolveNonNegativeIntegerEnv("0", 1, 3)).toBe(0);
     expect(resolveNonNegativeIntegerEnv("4", 1, 3)).toBe(3);
+  });
+});
+
+describe("cache lease heartbeat configuration", () => {
+  it("defaults to half the lease TTL and never exceeds it", () => {
+    expect(resolveCacheLeaseTtlMs(undefined)).toBe(5_000);
+    expect(resolveCacheLeaseHeartbeatMs(undefined, 5_000)).toBe(2_500);
+    expect(resolveCacheLeaseHeartbeatMs("9000", 5_000)).toBe(2_500);
+  });
+
+  it("keeps malformed and non-positive heartbeat values bounded", () => {
+    expect(resolveCacheLeaseHeartbeatMs("nope", 1_000)).toBe(500);
+    expect(resolveCacheLeaseHeartbeatMs("0", 1_000)).toBe(500);
+    expect(resolveCacheLeaseHeartbeatMs("250", 1_000)).toBe(250);
   });
 });

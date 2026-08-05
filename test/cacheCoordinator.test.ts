@@ -18,6 +18,7 @@ describe("cross-replica cache coordination", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("lets one lease holder populate the cache for a competing replica", async () => {
@@ -146,5 +147,78 @@ describe("cross-replica cache coordination", () => {
 
     await expect(pending).rejects.toBeInstanceOf(RequestAbortedError);
     expect(load).not.toHaveBeenCalled();
+  });
+
+  it("renews a held lease and stops the heartbeat after the load settles", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("CACHE_LEASE_TTL_MS", "20");
+    vi.stubEnv("CACHE_LEASE_HEARTBEAT_MS", "10");
+    let releaseLoad: (() => void) | undefined;
+    const renewLease = vi.fn(async () => true);
+    const pending = coordinateCacheMiss({
+      store: baseStore({
+        async tryAcquireLease() {
+          return true;
+        },
+        async releaseLease() {},
+        renewLease,
+      }),
+      cacheKey: "renewed-search",
+      readFresh: async () => undefined,
+      load: async () => {
+        await new Promise<void>((resolve) => {
+          releaseLoad = resolve;
+        });
+        return "articles";
+      },
+    });
+
+    for (let step = 0; step < 4; step += 1) {
+      await Promise.resolve();
+    }
+    expect(releaseLoad).toBeDefined();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(renewLease).toHaveBeenCalledOnce();
+
+    releaseLoad?.();
+    await expect(pending).resolves.toMatchObject({ value: "articles", source: "upstream" });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(renewLease).toHaveBeenCalledOnce();
+  });
+
+  it("stops renewing after Redis reports that the owner token is gone", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("CACHE_LEASE_TTL_MS", "20");
+    vi.stubEnv("CACHE_LEASE_HEARTBEAT_MS", "10");
+    let releaseLoad: (() => void) | undefined;
+    const renewLease = vi.fn(async () => false);
+    const pending = coordinateCacheMiss({
+      store: baseStore({
+        async tryAcquireLease() {
+          return true;
+        },
+        async releaseLease() {},
+        renewLease,
+      }),
+      cacheKey: "lost-search",
+      readFresh: async () => undefined,
+      load: async () => {
+        await new Promise<void>((resolve) => {
+          releaseLoad = resolve;
+        });
+        return "articles";
+      },
+    });
+
+    for (let step = 0; step < 4; step += 1) {
+      await Promise.resolve();
+    }
+    expect(releaseLoad).toBeDefined();
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(renewLease).toHaveBeenCalledOnce();
+
+    releaseLoad?.();
+    await expect(pending).resolves.toMatchObject({ value: "articles", source: "upstream" });
   });
 });
