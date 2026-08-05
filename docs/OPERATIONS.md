@@ -21,7 +21,7 @@
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window. |
 | `DISABLE_RATE_LIMIT` | `0` | Set to `1` to disable limiting (emergency only). |
 | `TRUST_PROXY` | `0` | Set to `1` behind a reverse proxy so rate limits use `X-Forwarded-For`. |
-| `REDIS_URL` | — | If set (e.g. `redis://localhost:6379`), article search results are cached in Redis with the same TTL as in-memory mode. Omit to use the in-process cache only. |
+| `REDIS_URL` | — | If set (e.g. `redis://localhost:6379`), article search results and rate-limit quotas use Redis. Omit to use per-process memory stores. |
 | `CLIENT_API_KEYS` | — | Comma-separated secrets. When set, every `/api/*` request must send header `X-API-Key` matching one value. Omit to allow unauthenticated API access (still use network controls in production). |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Base OTLP URL (e.g. `http://jaeger:4318`). Traces POST to `/v1/traces`. Enables tracing when set. |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | — | Full traces URL; overrides the base + `/v1/traces` combination. |
@@ -49,6 +49,8 @@ with documented maximums are clamped.
 
 - **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL, bounded to `CACHE_MAX_KEYS` entries with least-recently-used eviction). Each replica has its own entries. Fresh and stale keys share this capacity; expired entries are removed on access and new writes evict the oldest live entry when needed.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries.
+- **Rate limits with `REDIS_URL`:** `rate-limit-redis` shares the quota across instances under the `news-api:rate-limit:` prefix. The limiter uses a separate Redis connection and fails closed with structured `503` errors if its store is unavailable.
+- **Rate limits without `REDIS_URL`:** the built-in memory store protects each process independently; it does not provide cross-replica quota consistency.
 - Cache keys include normalized search parameters: query, count, page, `lang`, `country`, `from`, `to`, and `sortBy`.
 - Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, contains malformed Redis JSON, or contains a value that is not a valid article array, the service logs a warning, increments cache error metrics, deletes the corrupt key on a best-effort basis, falls through to GNews on read failure, and still returns the upstream response on write failure.
 - Provider payloads with more than `100` articles are rejected as invalid so an upstream response cannot bypass the API's bounded collection contract.
@@ -59,7 +61,11 @@ with documented maximums are clamped.
 - Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
 - Successful searches are also written to a longer-lived stale cache key. If a later fresh miss hits an upstream failure and stale data is available, `/api/v1/*` returns `meta.cache=stale` and `X-Cache-Status: stale` with a `200` response instead of surfacing the provider outage.
 
-On shutdown the server closes the Redis connection when that backend was used.
+Rate limiting uses `standardHeaders: draft-8`, disables legacy `X-RateLimit-*` headers, applies
+the library's IPv6 `/56` key policy, and sends `Retry-After` when a quota is exceeded. Set
+`TRUST_PROXY=1` only when the service is behind one trusted proxy hop.
+
+On shutdown the server closes the cache and rate-limit Redis connections when those backends were used.
 
 ## Metrics
 
@@ -71,6 +77,7 @@ On shutdown the server closes the Redis connection when that backend was used.
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale|delete|delete_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, skipping stale fallback, or failing to quarantine a corrupt entry. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |
+| `news_rate_limit_store_errors_total` | `source=request|lifecycle|connection` | Rate-limit Redis/store failures; the request path fails closed with `503`. |
 | `news_upstream_requests_total` | `outcome=success|error|invalid_payload` | GNews provider request outcomes. |
 | `news_upstream_retries_total` | — | Transient upstream retry attempts. |
 | `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload` | GNews provider request latency histogram. |

@@ -31,6 +31,13 @@ export const cacheEvictionsTotal = new Counter({
   registers: [register],
 });
 
+export const rateLimitStoreErrorsTotal = new Counter({
+  name: "news_rate_limit_store_errors_total",
+  help: "Total rate-limit store errors by source",
+  labelNames: ["source"],
+  registers: [register],
+});
+
 export const upstreamRequestsTotal = new Counter({
   name: "news_upstream_requests_total",
   help: "Total upstream news provider requests by outcome",

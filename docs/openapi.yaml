@@ -592,6 +592,14 @@ components:
         type: string
         pattern: "^[0-9]+$"
         example: "120"
+    RateLimit:
+      description: Combined draft-8 rate-limit policy state.
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: Draft-8 rate-limit policy identifier.
+      schema:
+        type: string
 
   responses:
     Unauthorized:
@@ -611,6 +619,10 @@ components:
       headers:
         Retry-After:
           $ref: "#/components/headers/RetryAfter"
+        RateLimit:
+          $ref: "#/components/headers/RateLimit"
+        RateLimit-Policy:
+          $ref: "#/components/headers/RateLimitPolicy"
       content:
         application/json:
           schema:
@@ -644,6 +656,10 @@ components:
       headers:
         Retry-After:
           $ref: "#/components/headers/RetryAfter"
+        RateLimit:
+          $ref: "#/components/headers/RateLimit"
+        RateLimit-Policy:
+          $ref: "#/components/headers/RateLimitPolicy"
       content:
         application/json:
           schema:
@@ -661,7 +677,7 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     V1ServiceUnavailable:
-      description: Upstream provider is temporarily unavailable or the circuit breaker is open
+      description: Upstream provider or rate-limit store is temporarily unavailable, or the circuit breaker is open
       headers:
         Retry-After:
           $ref: "#/components/headers/RetryAfter"
@@ -670,7 +686,7 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     ServiceUnavailable:
-      description: Upstream provider is temporarily unavailable or the circuit breaker is open
+      description: Upstream provider or rate-limit store is temporarily unavailable, or the circuit breaker is open
       headers:
         Retry-After:
           $ref: "#/components/headers/RetryAfter"

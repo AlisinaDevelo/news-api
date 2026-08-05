@@ -5,6 +5,7 @@ import { disconnectCacheStore } from "./cache/store";
 import { requireApiKeyUnlessTest } from "./config/env";
 import { resolvePositiveIntegerEnv } from "./config/numbers";
 import { logger } from "./logger";
+import { disconnectRateLimitStore } from "./middleware/rateLimit";
 import { shutdownTracing } from "./tracing";
 
 requireApiKeyUnlessTest();
@@ -24,6 +25,11 @@ function shutdown(signal: string) {
         await disconnectCacheStore();
       } catch (e) {
         logger.error({ err: e }, "cache disconnect error");
+      }
+      try {
+        await disconnectRateLimitStore();
+      } catch (e) {
+        logger.error({ err: e }, "rate-limit disconnect error");
       }
       try {
         await shutdownTracing();

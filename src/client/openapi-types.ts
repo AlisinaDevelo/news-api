@@ -336,6 +336,8 @@ export interface components {
         TooManyRequests: {
             headers: {
                 "Retry-After": components["headers"]["RetryAfter"];
+                RateLimit: components["headers"]["RateLimit"];
+                "RateLimit-Policy": components["headers"]["RateLimitPolicy"];
                 [name: string]: unknown;
             };
             content: {
@@ -382,6 +384,8 @@ export interface components {
         V1TooManyRequests: {
             headers: {
                 "Retry-After": components["headers"]["RetryAfter"];
+                RateLimit: components["headers"]["RateLimit"];
+                "RateLimit-Policy": components["headers"]["RateLimitPolicy"];
                 [name: string]: unknown;
             };
             content: {
@@ -406,7 +410,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
-        /** @description Upstream provider is temporarily unavailable or the circuit breaker is open */
+        /** @description Upstream provider or rate-limit store is temporarily unavailable, or the circuit breaker is open */
         V1ServiceUnavailable: {
             headers: {
                 "Retry-After": components["headers"]["RetryAfter"];
@@ -416,7 +420,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
-        /** @description Upstream provider is temporarily unavailable or the circuit breaker is open */
+        /** @description Upstream provider or rate-limit store is temporarily unavailable, or the circuit breaker is open */
         ServiceUnavailable: {
             headers: {
                 "Retry-After": components["headers"]["RetryAfter"];
@@ -453,6 +457,10 @@ export interface components {
         CacheStatus: "hit" | "miss" | "stale";
         /** @description Normalized upstream retry delay in delta-seconds, capped at 86400 seconds. */
         RetryAfter: string;
+        /** @description Combined draft-8 rate-limit policy state. */
+        RateLimit: string;
+        /** @description Draft-8 rate-limit policy identifier. */
+        RateLimitPolicy: string;
     };
     pathItems: never;
 }
