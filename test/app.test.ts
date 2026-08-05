@@ -157,6 +157,7 @@ describe("app", () => {
       expect.objectContaining({
         params: expect.objectContaining({ q: "tech", max: 2 }),
         timeout: expect.any(Number),
+        signal: expect.any(AbortSignal),
         maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
       })
     );

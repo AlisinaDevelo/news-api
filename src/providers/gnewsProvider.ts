@@ -12,6 +12,7 @@ import {
 import { isArticleList, type Article } from "../types/article";
 import { ArticleSearchOptions } from "../types/search";
 import { withSpan } from "../tracing";
+import { shutdownSignal } from "../runtime/lifecycle";
 import { withUpstreamRetries } from "./retry";
 
 export interface NewsProvider {
@@ -184,6 +185,7 @@ export class GNewsProvider implements NewsProvider {
             axios.get<{ articles: Article[] }>(`${UPSTREAM_BASE_URL}/search`, {
               params: toProviderParams(options),
               timeout: UPSTREAM_TIMEOUT_MS,
+              signal: shutdownSignal(),
               maxContentLength: MAX_UPSTREAM_RESPONSE_BYTES,
               validateStatus: (s) => s >= 200 && s < 300,
             })
