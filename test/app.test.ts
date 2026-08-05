@@ -26,6 +26,7 @@ import {
   setCacheStoreForTests,
 } from "../src/cache/store";
 import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
+import { resetNewsServiceForTests } from "../src/services/newsService";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../src/constants";
 import { beginDraining, resetLifecycleForTests } from "../src/runtime/lifecycle";
 
@@ -43,6 +44,7 @@ describe("app", () => {
     mockGet.mockReset();
     resetCacheStoreForTests();
     resetGNewsCircuitForTests();
+    resetNewsServiceForTests();
     resetLifecycleForTests();
   });
 

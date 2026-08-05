@@ -6,8 +6,20 @@ import { cacheErrorsTotal, cacheEventsTotal } from "../metrics/register";
 import { logger } from "../logger";
 import { newsProvider } from "../providers/gnewsProvider";
 import { markSpanError, withSpan } from "../tracing";
+import {
+  isRequestAbortedError,
+  RequestAbortedError,
+  throwIfAborted,
+} from "../runtime/requestCancellation";
 
-const inFlightSearches = new Map<string, Promise<ArticleSearchResult>>();
+interface InFlightSearch {
+  promise: Promise<ArticleSearchResult>;
+  controller: AbortController;
+  subscribers: number;
+  settled: boolean;
+}
+
+const inFlightSearches = new Map<string, InFlightSearch>();
 const STALE_CACHE_TTL_SEC = resolveStaleCacheTtlSec();
 
 export type ArticleSearchCacheStatus = "hit" | "miss" | "coalesced" | "stale";
@@ -175,12 +187,17 @@ async function writeCachedArticles(
 async function fetchArticlesFromUpstream(
   options: ArticleSearchOptions,
   store: CacheStore,
-  cacheKey: string
+  cacheKey: string,
+  signal: AbortSignal
 ): Promise<ArticleSearchResult> {
   let articles: Article[];
   try {
-    articles = await newsProvider.search(options);
+    articles = await newsProvider.search(options, signal);
+    throwIfAborted(signal);
   } catch (err) {
+    if (signal.aborted || isRequestAbortedError(err)) {
+      throw err instanceof RequestAbortedError ? err : new RequestAbortedError();
+    }
     return withSpan(
       "news.cache.stale_fallback",
       { "news.fallback.reason": "upstream_error" },
@@ -201,10 +218,90 @@ async function fetchArticlesFromUpstream(
   return { articles, cache: "miss" };
 }
 
+function markInFlightSettled(cacheKey: string, entry: InFlightSearch): void {
+  entry.settled = true;
+  if (inFlightSearches.get(cacheKey) === entry) {
+    inFlightSearches.delete(cacheKey);
+  }
+}
+
+function createInFlightSearch(
+  options: ArticleSearchOptions,
+  store: CacheStore,
+  cacheKey: string
+): InFlightSearch {
+  const entry: InFlightSearch = {
+    promise: Promise.resolve({ articles: [], cache: "miss" }),
+    controller: new AbortController(),
+    subscribers: 0,
+    settled: false,
+  };
+  inFlightSearches.set(cacheKey, entry);
+  entry.promise = fetchArticlesFromUpstream(options, store, cacheKey, entry.controller.signal);
+  void entry.promise.then(
+    () => markInFlightSettled(cacheKey, entry),
+    () => markInFlightSettled(cacheKey, entry)
+  );
+  return entry;
+}
+
+function waitForInFlightSearch(
+  entry: InFlightSearch,
+  signal?: AbortSignal
+): Promise<ArticleSearchResult> {
+  throwIfAborted(signal);
+  entry.subscribers += 1;
+
+  return new Promise((resolve, reject) => {
+    let released = false;
+    const release = (): void => {
+      if (released) {
+        return;
+      }
+      released = true;
+      signal?.removeEventListener("abort", onAbort);
+      entry.subscribers -= 1;
+      if (!entry.settled && entry.subscribers === 0) {
+        entry.controller.abort();
+      }
+    };
+    const onAbort = (): void => {
+      release();
+      reject(new RequestAbortedError());
+    };
+
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+    entry.promise.then(
+      (result) => {
+        release();
+        resolve(result);
+      },
+      (error: unknown) => {
+        release();
+        reject(error);
+      }
+    );
+  });
+}
+
+/** @internal tests */
+export function resetNewsServiceForTests(): void {
+  for (const entry of inFlightSearches.values()) {
+    entry.controller.abort();
+  }
+  inFlightSearches.clear();
+}
+
 export const searchArticles = async (
-  options: ArticleSearchOptions
+  options: ArticleSearchOptions,
+  signal?: AbortSignal
 ): Promise<ArticleSearchResult> =>
   withSpan("news.search", {}, async (span) => {
+    throwIfAborted(signal);
     const cacheKey = searchCacheKey(options);
     const store = getCacheStore();
     const cached = await readCachedArticles(store, cacheKey);
@@ -214,32 +311,33 @@ export const searchArticles = async (
     }
 
     const existing = inFlightSearches.get(cacheKey);
+    const entry = existing ?? createInFlightSearch(options, store, cacheKey);
     if (existing) {
       cacheEventsTotal.inc({ result: "coalesced" });
-      const result = await existing;
+    }
+    const result = await waitForInFlightSearch(entry, signal);
+    if (existing) {
       const coalesced = { ...result, cache: result.cache === "miss" ? "coalesced" : result.cache };
       span.setAttribute("news.search.cache", coalesced.cache);
       return coalesced;
     }
-
-    const search = fetchArticlesFromUpstream(options, store, cacheKey);
-    inFlightSearches.set(cacheKey, search);
-    try {
-      const result = await search;
-      span.setAttribute("news.search.cache", result.cache);
-      return result;
-    } finally {
-      inFlightSearches.delete(cacheKey);
-    }
+    span.setAttribute("news.search.cache", result.cache);
+    return result;
   });
 
-export const fetchArticles = async (options: ArticleSearchOptions): Promise<Article[]> => {
-  const result = await searchArticles(options);
+export const fetchArticles = async (
+  options: ArticleSearchOptions,
+  signal?: AbortSignal
+): Promise<Article[]> => {
+  const result = await searchArticles(options, signal);
   return result.articles;
 };
 
-export const fetchArticlesByTitle = async (title: string): Promise<Article | undefined> => {
-  const articles = await fetchArticles({ query: title, count: 10, page: 1 });
+export const fetchArticlesByTitle = async (
+  title: string,
+  signal?: AbortSignal
+): Promise<Article | undefined> => {
+  const articles = await fetchArticles({ query: title, count: 10, page: 1 }, signal);
   return articles.find((article) => article.title === title);
 };
 
@@ -247,9 +345,10 @@ export const fetchArticlesBySource = async (
   sourceName: string,
   count: number,
   filters: ArticleSearchFilters = {},
-  page = 1
+  page = 1,
+  signal?: AbortSignal
 ): Promise<Article[]> => {
-  const articles = await fetchArticles({ query: sourceName, count, page, ...filters });
+  const articles = await fetchArticles({ query: sourceName, count, page, ...filters }, signal);
   const target = sourceName.toLowerCase();
   return articles.filter((article) => article.source.name.toLowerCase() === target);
 };

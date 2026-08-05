@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { HttpError } from "../errors/HttpError";
 import { logger } from "../logger";
 import { requestId } from "../http/responses";
+import { isRequestAbortedError } from "../runtime/requestCancellation";
 
 /** Avoid `instanceof` alone: test runners may load duplicate class copies. */
 function isHttpError(err: unknown): err is HttpError {
@@ -27,6 +28,10 @@ export function errorHandler(
   _next: NextFunction
 ): void {
   const log = req.log ?? logger;
+
+  if (isRequestAbortedError(err)) {
+    return;
+  }
 
   if (isHttpError(err)) {
     if (err.retryAfter !== undefined) {
