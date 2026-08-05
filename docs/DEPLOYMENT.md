@@ -17,6 +17,7 @@ Set these variables on the hosting platform:
 | `CLIENT_API_KEYS` | generated secret | Recommended for a public demo; protects `/api/*`. |
 | `REDIS_URL` | managed Redis URL | Optional. Use it if the platform makes Redis cheap/easy. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Graceful drain deadline; give the platform a longer termination grace period. |
+| `UPSTREAM_TOTAL_TIMEOUT_MS` | `60000` | Total provider budget across retries; keep it below the platform request timeout. |
 
 Do not set `GNEWS_BASE_URL` in production unless you intentionally point at a compatible mock/provider. It exists for deterministic local tests, benchmarks, and CI smoke tests.
 

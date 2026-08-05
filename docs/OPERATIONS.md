@@ -10,6 +10,7 @@
 | `LOG_LEVEL` | `info` (non-test) | Pino level (`trace`–`fatal`, or `silent`). |
 | `GNEWS_BASE_URL` | `https://gnews.io/api/v4` | Upstream provider base URL. Override only for local integration tests, benchmarks, or compatible provider mocks. |
 | `HTTP_TIMEOUT_MS` | `15000` | Outbound GNews request timeout (max `60000`). |
+| `UPSTREAM_TOTAL_TIMEOUT_MS` | `60000` | Total GNews search budget across all attempts and retry backoff (max `120000`). |
 | `UPSTREAM_RETRY_ATTEMPTS` | `1` | Extra attempts for transient network/timeout and 5xx failures (maximum `3`; set `0` to disable). |
 | `UPSTREAM_RETRY_BASE_DELAY_MS` | `100` | Initial exponential retry delay with jitter (maximum `2000`). |
 | `STALE_CACHE_TTL_SEC` | `3600` | Longer-lived stale article cache TTL used only as an upstream-failure fallback (min effective value `>600`, max `86400`). |
@@ -57,6 +58,7 @@ with documented maximums are clamped.
 - Provider payloads with more than `100` articles are rejected as invalid so an upstream response cannot bypass the API's bounded collection contract.
 - The GNews client rejects response bodies larger than `5 MiB` before the payload reaches application validation.
 - Transient network/timeout and 5xx provider failures are retried with bounded exponential backoff and jitter. `429` and other 4xx responses, invalid payloads, and internal errors are not retried.
+- `HTTP_TIMEOUT_MS` limits each provider attempt; `UPSTREAM_TOTAL_TIMEOUT_MS` caps the entire search, including retries and backoff. Total-budget exhaustion is recorded as `timeout`, counts toward the circuit breaker, and uses the normal `502` upstream error. Client disconnects and process shutdown remain `canceled` and do not count as provider failures.
 - Provider `429` responses return `429` with code `upstream_rate_limited`; provider `503` responses return `503` with code `upstream_unavailable`. A valid provider `Retry-After` value is normalized to delta-seconds and capped at 86400 seconds, while arbitrary upstream headers are never forwarded.
 - The circuit breaker counts network failures, `408`, `425`, `429`, and 5xx responses; permanent 4xx responses remain visible as upstream errors without opening the circuit.
 - Identical in-flight misses are coalesced per process, so concurrent requests for the same normalized search wait on one upstream provider request.
@@ -94,9 +96,9 @@ approximately ten-percent trace sample while preserving parent decisions.
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |
 | `news_rate_limit_store_errors_total` | `source=request|lifecycle|connection` | Rate-limit Redis/store failures; the request path fails closed with `503`. |
 | `news_request_cancellations_total` | `reason=client_disconnect` | Downstream requests that disconnected before their response completed. |
-| `news_upstream_requests_total` | `outcome=success|error|invalid_payload|canceled` | GNews provider request outcomes. |
+| `news_upstream_requests_total` | `outcome=success|error|invalid_payload|canceled|timeout` | GNews provider request outcomes. |
 | `news_upstream_retries_total` | — | Transient upstream retry attempts. |
-| `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload|canceled` | GNews provider request latency histogram. |
+| `news_upstream_request_duration_seconds` | `outcome=success|error|invalid_payload|canceled|timeout` | GNews provider request latency histogram. |
 | `news_upstream_circuit_events_total` | `event=opened|short_circuit|half_open|closed` | Provider circuit breaker state transitions and short-circuited requests. |
 
 Use cache hit rate and coalesced miss counts to understand quota protection, cancellation counts to spot client churn or upstream latency pressure, stale counts to see when provider trouble is being hidden by cached data, cache error metrics to detect Redis/backend trouble, upstream latency/error metrics to separate provider trouble from local API trouble, and circuit events to see when repeated provider failures are being shed locally.
