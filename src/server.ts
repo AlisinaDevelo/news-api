@@ -1,8 +1,10 @@
 import "dotenv/config";
+import { createServer } from "node:http";
 import "./otel-bootstrap";
 import app from "./app";
 import { disconnectCacheStore } from "./cache/store";
 import { requireApiKeyUnlessTest } from "./config/env";
+import { configureHttpServer } from "./config/httpServer";
 import { resolvePositiveIntegerEnv } from "./config/numbers";
 import { logger } from "./logger";
 import { disconnectRateLimitStore } from "./middleware/rateLimit";
@@ -14,7 +16,8 @@ requireApiKeyUnlessTest();
 const PORT = resolvePositiveIntegerEnv(process.env.PORT, 3000, 65_535);
 const shutdownTimeoutMs = resolvePositiveIntegerEnv(process.env.SHUTDOWN_TIMEOUT_MS, 10_000);
 
-const server = app.listen(PORT, () => {
+const server = configureHttpServer(createServer(app));
+server.listen(PORT, () => {
   logger.info({ port: PORT }, "server listening");
 });
 
