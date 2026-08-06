@@ -13,7 +13,7 @@ flowchart LR
   Provider --> GNews["GNews API"]
 ```
 
-1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented.
+1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented. `src/server.ts` creates a Node `http.Server` with explicit request/header/keep-alive/socket-reuse limits before listening.
 2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`; uses shared Redis quotas when configured), then mounts `/api` routes.
 3. **Controllers** validate query parameters, create a response-lifecycle abort signal, and map domain results to HTTP status codes.
 4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `page`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and when Redis is active coordinates cold misses with a short owner-token lease plus a half-TTL heartbeat during slow loads. It tracks each caller as a subscriber and delegates upstream fetches to the GNews provider adapter. A disconnected subscriber stops awaiting the shared promise; the shared provider is aborted only when no subscribers remain. Cache and lease backend errors are logged and metriced without failing the article request.
@@ -83,6 +83,15 @@ to the shared store drawn above.
 
 - `dotenv` loads `.env` when `src/server.ts` starts (not required for Vitest, which sets `NODE_ENV=test` and mocks HTTP).
 - `requireApiKeyUnlessTest` exits the process on startup if `GNEWS_API_KEY` is missing outside test mode.
+
+## HTTP transport
+
+The application server has explicit limits for incomplete requests and connection reuse:
+`SERVER_HEADERS_TIMEOUT_MS` protects slow header delivery, `SERVER_REQUEST_TIMEOUT_MS` bounds
+receipt of the complete request, `SERVER_KEEP_ALIVE_TIMEOUT_MS` retires idle connections, and
+`SERVER_MAX_REQUESTS_PER_SOCKET` limits connection reuse. These controls are separate from the
+provider's `UPSTREAM_TOTAL_TIMEOUT_MS` and the graceful drain `SHUTDOWN_TIMEOUT_MS`; a reverse
+proxy can use stricter values but should keep the budgets deliberate.
 
 ## Errors
 

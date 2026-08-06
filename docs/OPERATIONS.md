@@ -23,6 +23,10 @@
 | `CACHE_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Maximum time the article-cache Redis client waits while establishing a connection. Values above `5000` are clamped. |
 | `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Positive integer number of consecutive provider failures before the circuit opens; invalid values fall back to `3`. |
 | `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). Only one recovery probe is allowed after cooldown. |
+| `SERVER_REQUEST_TIMEOUT_MS` | `75000` | Maximum time to receive a complete incoming HTTP request. Values above `120000` are clamped; keep it above `UPSTREAM_TOTAL_TIMEOUT_MS` when provider work can run to its budget. Node returns `408` when this expires. |
+| `SERVER_HEADERS_TIMEOUT_MS` | `10000` | Maximum time to receive complete HTTP headers. Values above `60000` and values above the request timeout are clamped; Node returns `408` when this expires. |
+| `SERVER_KEEP_ALIVE_TIMEOUT_MS` | `5000` | Idle time after a response before the HTTP server closes a keep-alive socket. Values above `120000` are clamped. |
+| `SERVER_MAX_REQUESTS_PER_SOCKET` | `1000` | Maximum requests per keep-alive socket. Values above `10000` are clamped; set `0` only when a trusted proxy owns connection reuse. Node returns `503` beyond the cap. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
 | `RATE_LIMIT_MAX` | `120` | Max requests per IP per window. |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window. |
@@ -82,6 +86,13 @@ the library's IPv6 `/56` key policy, and sends `Retry-After` when a quota is exc
 `TRUST_PROXY=1` only when the service is behind one trusted proxy hop.
 
 On shutdown the server closes the cache and rate-limit Redis connections when those backends were used.
+
+The production HTTP server applies explicit transport limits. `SERVER_REQUEST_TIMEOUT_MS` covers
+receiving the request body, while `UPSTREAM_TOTAL_TIMEOUT_MS` covers provider work after routing;
+the request setting should remain slightly higher. Header parsing has its own shorter budget, idle
+keep-alive sockets are closed after `SERVER_KEEP_ALIVE_TIMEOUT_MS`, and a socket is retired after
+`SERVER_MAX_REQUESTS_PER_SOCKET` requests. A reverse proxy may impose stricter limits, but should
+keep its request and idle budgets compatible with these application settings.
 
 ## Tracing
 

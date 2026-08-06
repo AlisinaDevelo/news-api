@@ -20,6 +20,10 @@ Set these variables on the hosting platform:
 | `CACHE_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Article-cache Redis connection budget; values above `5000` ms are clamped. |
 | `RATE_LIMIT_REDIS_COMMAND_TIMEOUT_MS` | `500` | Shared rate-limit Redis reply budget; values above `1000` ms are clamped. Store failures return structured `503`. |
 | `RATE_LIMIT_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Shared rate-limit Redis connection budget; values above `5000` ms are clamped. |
+| `SERVER_REQUEST_TIMEOUT_MS` | `75000` | Complete incoming request budget; keep above `UPSTREAM_TOTAL_TIMEOUT_MS`. Values above `120000` ms are clamped. |
+| `SERVER_HEADERS_TIMEOUT_MS` | `10000` | Slow-header protection; values above `60000` ms and above the request budget are clamped. |
+| `SERVER_KEEP_ALIVE_TIMEOUT_MS` | `5000` | Idle keep-alive socket budget. Values above `120000` ms are clamped. |
+| `SERVER_MAX_REQUESTS_PER_SOCKET` | `1000` | Maximum requests per connection; set `0` only when a trusted proxy owns connection reuse. |
 | `CACHE_LEASE_TTL_MS` | `5000` | Short cross-replica cache-miss lease; only active with managed Redis. |
 | `CACHE_LEASE_HEARTBEAT_MS` | half of lease TTL | Owner-checked renewal interval for slow provider work. |
 | `CACHE_LEASE_WAIT_MS` | `750` | Bounded wait for another replica to populate the shared cache. |
@@ -88,3 +92,8 @@ Use the platform's normal stop signal so the container receives `SIGTERM`. The s
 readiness as draining, lets active HTTP requests finish, and aborts outbound provider work only
 when `SHUTDOWN_TIMEOUT_MS` expires. Configure the platform's termination grace period longer than
 that deadline; the image declares `STOPSIGNAL SIGTERM` explicitly.
+
+Keep the platform or reverse-proxy request timeout above `SERVER_REQUEST_TIMEOUT_MS` and
+`UPSTREAM_TOTAL_TIMEOUT_MS` so the application can return its normal structured errors. Proxy
+header and keep-alive limits may be stricter, but should be intentional and documented alongside
+the application settings.
