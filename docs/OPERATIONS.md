@@ -19,6 +19,8 @@
 | `CACHE_LEASE_HEARTBEAT_MS` | half of `CACHE_LEASE_TTL_MS` | Owner-token-safe Redis TTL renewal interval. It is capped at half the lease TTL and `15000` ms. |
 | `CACHE_LEASE_WAIT_MS` | `750` | Maximum time a replica waits for another replica to fill a fresh cache key before fetching upstream. Values above `5000` are clamped. |
 | `CACHE_LEASE_POLL_MS` | `50` | Base Redis/cache recheck interval while waiting for a shared miss. Values above `500` are clamped and jitter is applied. |
+| `CACHE_REDIS_COMMAND_TIMEOUT_MS` | `500` | Maximum time an article-cache Redis command waits for a reply. Values above `1000` are clamped. |
+| `CACHE_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Maximum time the article-cache Redis client waits while establishing a connection. Values above `5000` are clamped. |
 | `UPSTREAM_CIRCUIT_FAILURE_THRESHOLD` | `3` | Positive integer number of consecutive provider failures before the circuit opens; invalid values fall back to `3`. |
 | `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). Only one recovery probe is allowed after cooldown. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
@@ -55,6 +57,7 @@ with documented maximums are clamped.
 
 - **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL, bounded to `CACHE_MAX_KEYS` entries with least-recently-used eviction). Each replica has its own entries. Fresh and stale keys share this capacity; expired entries are removed on access and new writes evict the oldest live entry when needed.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries. Cold misses also use a short owner-token lease (`SET NX PX`) and bounded cache rechecks to reduce duplicate GNews calls across replicas. While the owner is still loading upstream, a half-TTL owner-checked heartbeat renews the lease; a lost lease or renewal error remains fail-open and never makes article requests fail by itself.
+- The article-cache Redis client uses the configured command and connection timeouts, retries each command at most once, and disables ioredis's offline command queue. A disconnected or slow cache command therefore fails promptly into the existing upstream/stale fallback path; reconnect attempts remain enabled so a recovered Redis instance can resume sharing cache entries. These settings apply to article caching and lease operations, not the separate fail-closed rate-limit client.
 - **Rate limits with `REDIS_URL`:** `rate-limit-redis` shares the quota across instances under the `news-api:rate-limit:` prefix. The limiter uses a separate Redis connection and fails closed with structured `503` errors if its store is unavailable.
 - **Rate limits without `REDIS_URL`:** the built-in memory store protects each process independently; it does not provide cross-replica quota consistency.
 - Cache keys include normalized search parameters: query, count, page, `lang`, `country`, `from`, `to`, and `sortBy`.

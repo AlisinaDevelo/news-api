@@ -16,6 +16,8 @@ Set these variables on the hosting platform:
 | `RATE_LIMIT_WINDOW_MS` | `60000` | One-minute demo window. |
 | `CLIENT_API_KEYS` | generated secret | Recommended for a public demo; protects `/api/*`. |
 | `REDIS_URL` | managed Redis URL | Optional. Use it if the platform makes Redis cheap/easy. |
+| `CACHE_REDIS_COMMAND_TIMEOUT_MS` | `500` | Article-cache Redis reply budget; values above `1000` ms are clamped. Cache failures remain fail-open. |
+| `CACHE_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Article-cache Redis connection budget; values above `5000` ms are clamped. |
 | `CACHE_LEASE_TTL_MS` | `5000` | Short cross-replica cache-miss lease; only active with managed Redis. |
 | `CACHE_LEASE_HEARTBEAT_MS` | half of lease TTL | Owner-checked renewal interval for slow provider work. |
 | `CACHE_LEASE_WAIT_MS` | `750` | Bounded wait for another replica to populate the shared cache. |
