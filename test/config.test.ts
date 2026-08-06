@@ -11,6 +11,9 @@ import {
   resolveCacheRedisCommandTimeoutMs,
   resolveCacheRedisConnectTimeoutMs,
   resolveCacheRedisOptions,
+  resolveRateLimitRedisCommandTimeoutMs,
+  resolveRateLimitRedisConnectTimeoutMs,
+  resolveRateLimitRedisOptions,
 } from "../src/config/redis";
 
 describe("resolvePositiveIntegerEnv", () => {
@@ -77,6 +80,35 @@ describe("cache Redis configuration", () => {
     expect(resolveCacheRedisConnectTimeoutMs("0")).toBe(1_000);
     expect(resolveCacheRedisConnectTimeoutMs("9000")).toBe(5_000);
     expect(resolveCacheRedisOptions("750", "2500")).toMatchObject({
+      commandTimeout: 750,
+      connectTimeout: 2_500,
+    });
+  });
+});
+
+describe("rate-limit Redis configuration", () => {
+  it("uses bounded command and connection timeout defaults", () => {
+    expect(resolveRateLimitRedisCommandTimeoutMs(undefined)).toBe(500);
+    expect(resolveRateLimitRedisConnectTimeoutMs(undefined)).toBe(1_000);
+    expect(resolveRateLimitRedisOptions(undefined, undefined)).toMatchObject({
+      commandTimeout: 500,
+      connectTimeout: 1_000,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      enableReadyCheck: true,
+      lazyConnect: false,
+    });
+  });
+
+  it("rejects malformed values and clamps configured maxima", () => {
+    expect(resolveRateLimitRedisCommandTimeoutMs("nope")).toBe(500);
+    expect(resolveRateLimitRedisCommandTimeoutMs("0")).toBe(500);
+    expect(resolveRateLimitRedisCommandTimeoutMs("1.5")).toBe(500);
+    expect(resolveRateLimitRedisCommandTimeoutMs("9000")).toBe(1_000);
+    expect(resolveRateLimitRedisConnectTimeoutMs("nope")).toBe(1_000);
+    expect(resolveRateLimitRedisConnectTimeoutMs("0")).toBe(1_000);
+    expect(resolveRateLimitRedisConnectTimeoutMs("9000")).toBe(5_000);
+    expect(resolveRateLimitRedisOptions("750", "2500")).toMatchObject({
       commandTimeout: 750,
       connectTimeout: 2_500,
     });

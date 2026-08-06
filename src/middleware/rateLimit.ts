@@ -7,9 +7,11 @@ import Redis from "ioredis";
 import { RedisStore, type RedisReply } from "rate-limit-redis";
 import type { Request } from "express";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
+import { resolveRateLimitRedisOptions } from "../config/redis";
 import { HttpError } from "../errors/HttpError";
 import { logger } from "../logger";
 import { rateLimitStoreErrorsTotal } from "../metrics/register";
+import { createRedisCommandRunner } from "../redis/commandRunner";
 
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_LIMIT = 120;
@@ -48,12 +50,10 @@ function rateLimitLogger() {
 }
 
 function createRedisStore(url: string): Store {
-  const client = new Redis(url, {
-    maxRetriesPerRequest: 2,
-    enableReadyCheck: true,
-    lazyConnect: false,
-  });
+  const options = resolveRateLimitRedisOptions();
+  const client = new Redis(url, options);
   redisClient = client;
+  const runCommand = createRedisCommandRunner(client, options.connectTimeout ?? 1_000);
   client.on("error", (err) => {
     rateLimitStoreErrorsTotal.inc({ source: "connection" });
     logger.error({ err }, "rate-limit redis connection error");
@@ -62,7 +62,7 @@ function createRedisStore(url: string): Store {
   return new RedisStore({
     prefix: REDIS_KEY_PREFIX,
     sendCommand: (command: string, ...args: string[]) =>
-      client.call(command, ...args) as Promise<RedisReply>,
+      runCommand(() => client.call(command, ...args)) as Promise<RedisReply>,
   });
 }
 

@@ -4,6 +4,7 @@ import { resolvePositiveIntegerEnv } from "../config/numbers";
 import { resolveCacheRedisOptions } from "../config/redis";
 import { logger } from "../logger";
 import { cacheEvictionsTotal } from "../metrics/register";
+import { createRedisCommandRunner } from "../redis/commandRunner";
 
 const TTL_SEC = 600;
 const DEFAULT_MAX_KEYS = 2_000;
@@ -127,49 +128,7 @@ function createRedisStore(url: string): CacheStore {
   client.on("error", (err) => {
     logger.error({ err }, "redis connection error");
   });
-
-  const waitForReady = (): Promise<void> => {
-    if (client.status === "ready") {
-      return Promise.resolve();
-    }
-    if (client.status === "end") {
-      return Promise.reject(new Error("Redis connection is closed"));
-    }
-
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const finish = (outcome: "ready" | "error", error?: Error): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        clearTimeout(timer);
-        client.off("ready", onReady);
-        client.off("end", onEnd);
-        if (outcome === "ready") {
-          resolve();
-        } else {
-          reject(error);
-        }
-      };
-      const timer = setTimeout(() => {
-        finish("error", new Error("Redis connection timed out"));
-      }, options.connectTimeout);
-      const onReady = (): void => finish("ready");
-      const onEnd = (): void => finish("error", new Error("Redis connection closed"));
-
-      client.once("ready", onReady);
-      client.once("end", onEnd);
-      if (client.status === "ready") {
-        onReady();
-      }
-    });
-  };
-
-  const runCommand = async <T>(command: () => Promise<T>): Promise<T> => {
-    await waitForReady();
-    return command();
-  };
+  const runCommand = createRedisCommandRunner(client, options.connectTimeout ?? 1_000);
 
   return {
     async get(key: string) {
