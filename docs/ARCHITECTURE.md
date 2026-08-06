@@ -98,7 +98,9 @@ Responses at or above 1 KiB are compressed when the client advertises support. I
 
 Rate limits use the in-process store without `REDIS_URL`. With `REDIS_URL`, each process uses a
 separate Redis connection and a namespaced `rate-limit-redis` store so replicas share quotas without
-sharing cache lifecycle state. Store errors fail closed with a structured `503`; IPv6 client keys
+sharing cache lifecycle state. The rate-limit Redis client uses bounded command/connection budgets,
+one request retry, and a bounded readiness gate before raw `sendCommand` calls. Store errors fail
+closed with a structured `503`; IPv6 client keys
 use the explicit `/56` subnet policy and trusted proxy behavior remains controlled by `TRUST_PROXY`.
 
 Successful upstream searches write both a fresh cache key and a longer-lived stale key. The fresh key protects latency and quota under normal conditions; the stale key is only read after an upstream failure. Versioned responses expose this through `meta.cache=stale` and `X-Cache-Status: stale`.

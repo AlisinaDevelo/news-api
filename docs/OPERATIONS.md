@@ -26,6 +26,8 @@
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
 | `RATE_LIMIT_MAX` | `120` | Max requests per IP per window. |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window. |
+| `RATE_LIMIT_REDIS_COMMAND_TIMEOUT_MS` | `500` | Maximum time a shared rate-limit Redis command waits for a reply. Values above `1000` are clamped; failures are fail-closed. |
+| `RATE_LIMIT_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Maximum time the shared rate-limit Redis client waits while establishing a connection. Values above `5000` are clamped. |
 | `DISABLE_RATE_LIMIT` | `0` | Set to `1` to disable limiting (emergency only). |
 | `TRUST_PROXY` | `0` | Set to `1` behind a reverse proxy so rate limits use `X-Forwarded-For`. |
 | `REDIS_URL` | — | If set (e.g. `redis://localhost:6379`), article search results and rate-limit quotas use Redis. Omit to use per-process memory stores. |
@@ -59,6 +61,7 @@ with documented maximums are clamped.
 - **`REDIS_URL` set:** responses are cached in **Redis** with the same TTL so multiple instances can share entries. Cold misses also use a short owner-token lease (`SET NX PX`) and bounded cache rechecks to reduce duplicate GNews calls across replicas. While the owner is still loading upstream, a half-TTL owner-checked heartbeat renews the lease; a lost lease or renewal error remains fail-open and never makes article requests fail by itself.
 - The article-cache Redis client uses the configured command and connection timeouts, retries each command at most once, and disables ioredis's offline command queue. A disconnected or slow cache command therefore fails promptly into the existing upstream/stale fallback path; reconnect attempts remain enabled so a recovered Redis instance can resume sharing cache entries. These settings apply to article caching and lease operations, not the separate fail-closed rate-limit client.
 - **Rate limits with `REDIS_URL`:** `rate-limit-redis` shares the quota across instances under the `news-api:rate-limit:` prefix. The limiter uses a separate Redis connection and fails closed with structured `503` errors if its store is unavailable.
+- The rate-limit Redis client uses its own command and connection budgets, retries each command at most once, and disables ioredis's offline command queue. Initial and reconnect readiness is bounded before a command is sent; a timeout or unavailable backend becomes the existing structured `503`, while healthy Redis retains shared `429` quota behavior.
 - **Rate limits without `REDIS_URL`:** the built-in memory store protects each process independently; it does not provide cross-replica quota consistency.
 - Cache keys include normalized search parameters: query, count, page, `lang`, `country`, `from`, `to`, and `sortBy`.
 - Cache reads/writes are non-fatal for article searches. If the cache backend is unavailable, contains malformed Redis JSON, or contains a value that is not a valid article array, the service logs a warning, increments cache error metrics, deletes the corrupt key on a best-effort basis, falls through to GNews on read failure, and still returns the upstream response on write failure.
