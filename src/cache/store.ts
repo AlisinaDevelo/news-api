@@ -1,6 +1,7 @@
 import NodeCache from "node-cache";
 import Redis from "ioredis";
 import { resolvePositiveIntegerEnv } from "../config/numbers";
+import { resolveCacheRedisOptions } from "../config/redis";
 import { logger } from "../logger";
 import { cacheEvictionsTotal } from "../metrics/register";
 
@@ -120,11 +121,7 @@ export function parseRedisCacheValue(raw: string): unknown {
 }
 
 function createRedisStore(url: string): CacheStore {
-  const client = new Redis(url, {
-    maxRetriesPerRequest: 2,
-    enableReadyCheck: true,
-    lazyConnect: false,
-  });
+  const client = new Redis(url, resolveCacheRedisOptions());
   redisClient = client;
   client.on("error", (err) => {
     logger.error({ err }, "redis connection error");

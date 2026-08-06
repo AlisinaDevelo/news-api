@@ -7,6 +7,11 @@ import {
   resolveCacheLeaseHeartbeatMs,
   resolveCacheLeaseTtlMs,
 } from "../src/config/cache";
+import {
+  resolveCacheRedisCommandTimeoutMs,
+  resolveCacheRedisConnectTimeoutMs,
+  resolveCacheRedisOptions,
+} from "../src/config/redis";
 
 describe("resolvePositiveIntegerEnv", () => {
   it("uses the fallback for missing, malformed, or non-positive values", () => {
@@ -46,5 +51,34 @@ describe("cache lease heartbeat configuration", () => {
     expect(resolveCacheLeaseHeartbeatMs("nope", 1_000)).toBe(500);
     expect(resolveCacheLeaseHeartbeatMs("0", 1_000)).toBe(500);
     expect(resolveCacheLeaseHeartbeatMs("250", 1_000)).toBe(250);
+  });
+});
+
+describe("cache Redis configuration", () => {
+  it("uses bounded command and connection timeout defaults", () => {
+    expect(resolveCacheRedisCommandTimeoutMs(undefined)).toBe(500);
+    expect(resolveCacheRedisConnectTimeoutMs(undefined)).toBe(1_000);
+    expect(resolveCacheRedisOptions(undefined, undefined)).toMatchObject({
+      commandTimeout: 500,
+      connectTimeout: 1_000,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      enableReadyCheck: true,
+      lazyConnect: false,
+    });
+  });
+
+  it("rejects malformed values and clamps configured maxima", () => {
+    expect(resolveCacheRedisCommandTimeoutMs("nope")).toBe(500);
+    expect(resolveCacheRedisCommandTimeoutMs("0")).toBe(500);
+    expect(resolveCacheRedisCommandTimeoutMs("1.5")).toBe(500);
+    expect(resolveCacheRedisCommandTimeoutMs("9000")).toBe(1_000);
+    expect(resolveCacheRedisConnectTimeoutMs("nope")).toBe(1_000);
+    expect(resolveCacheRedisConnectTimeoutMs("0")).toBe(1_000);
+    expect(resolveCacheRedisConnectTimeoutMs("9000")).toBe(5_000);
+    expect(resolveCacheRedisOptions("750", "2500")).toMatchObject({
+      commandTimeout: 750,
+      connectTimeout: 2_500,
+    });
   });
 });
