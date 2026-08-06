@@ -121,34 +121,79 @@ export function parseRedisCacheValue(raw: string): unknown {
 }
 
 function createRedisStore(url: string): CacheStore {
-  const client = new Redis(url, resolveCacheRedisOptions());
+  const options = resolveCacheRedisOptions();
+  const client = new Redis(url, options);
   redisClient = client;
   client.on("error", (err) => {
     logger.error({ err }, "redis connection error");
   });
+
+  const waitForReady = (): Promise<void> => {
+    if (client.status === "ready") {
+      return Promise.resolve();
+    }
+    if (client.status === "end") {
+      return Promise.reject(new Error("Redis connection is closed"));
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (outcome: "ready" | "error", error?: Error): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        client.off("ready", onReady);
+        client.off("end", onEnd);
+        if (outcome === "ready") {
+          resolve();
+        } else {
+          reject(error);
+        }
+      };
+      const timer = setTimeout(() => {
+        finish("error", new Error("Redis connection timed out"));
+      }, options.connectTimeout);
+      const onReady = (): void => finish("ready");
+      const onEnd = (): void => finish("error", new Error("Redis connection closed"));
+
+      client.once("ready", onReady);
+      client.once("end", onEnd);
+      if (client.status === "ready") {
+        onReady();
+      }
+    });
+  };
+
+  const runCommand = async <T>(command: () => Promise<T>): Promise<T> => {
+    await waitForReady();
+    return command();
+  };
+
   return {
     async get(key: string) {
-      const raw = await client.get(key);
+      const raw = await runCommand(() => client.get(key));
       if (raw === null) {
         return undefined;
       }
       return parseRedisCacheValue(raw);
     },
     async set(key: string, value: unknown, ttlSec = TTL_SEC) {
-      await client.setex(key, ttlSec, JSON.stringify(value));
+      await runCommand(() => client.setex(key, ttlSec, JSON.stringify(value)));
     },
     async delete(key: string) {
-      await client.del(key);
+      await runCommand(() => client.del(key));
     },
     async tryAcquireLease(key: string, owner: string, ttlMs: number) {
-      const result = await client.set(key, owner, "PX", ttlMs, "NX");
+      const result = await runCommand(() => client.set(key, owner, "PX", ttlMs, "NX"));
       return result === "OK";
     },
     async releaseLease(key: string, owner: string) {
-      await client.eval(RELEASE_LEASE_SCRIPT, 1, key, owner);
+      await runCommand(() => client.eval(RELEASE_LEASE_SCRIPT, 1, key, owner));
     },
     async renewLease(key: string, owner: string, ttlMs: number) {
-      const result = await client.eval(RENEW_LEASE_SCRIPT, 1, key, owner, ttlMs);
+      const result = await runCommand(() => client.eval(RENEW_LEASE_SCRIPT, 1, key, owner, ttlMs));
       return Number(result) === 1;
     },
   };
