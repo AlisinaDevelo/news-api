@@ -10,13 +10,14 @@ import { logger } from "./logger";
 import { disconnectRateLimitStore } from "./middleware/rateLimit";
 import { shutdownTracing } from "./tracing";
 import { createShutdownHandler } from "./runtime/shutdown";
+import { instrumentHttpServer } from "./runtime/httpServerEvents";
 
 requireApiKeyUnlessTest();
 
 const PORT = resolvePositiveIntegerEnv(process.env.PORT, 3000, 65_535);
 const shutdownTimeoutMs = resolvePositiveIntegerEnv(process.env.SHUTDOWN_TIMEOUT_MS, 10_000);
 
-const server = configureHttpServer(createServer(app));
+const server = instrumentHttpServer(configureHttpServer(createServer(app)));
 server.listen(PORT, () => {
   logger.info({ port: PORT }, "server listening");
 });

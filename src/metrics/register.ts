@@ -11,6 +11,13 @@ export const httpRequestsTotal = new Counter({
   registers: [register],
 });
 
+export const httpServerEventsTotal = new Counter({
+  name: "news_http_server_events_total",
+  help: "Total HTTP transport events outside Express request handling",
+  labelNames: ["event"],
+  registers: [register],
+});
+
 export const cacheEventsTotal = new Counter({
   name: "news_cache_events_total",
   help: "Total news search cache lookups by result",
