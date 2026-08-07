@@ -26,6 +26,8 @@
 | `SERVER_REQUEST_TIMEOUT_MS` | `75000` | Maximum time to receive a complete incoming HTTP request. Values above `120000` are clamped; keep it above `UPSTREAM_TOTAL_TIMEOUT_MS` when provider work can run to its budget. Node returns `408` when this expires. |
 | `SERVER_HEADERS_TIMEOUT_MS` | `10000` | Maximum time to receive complete HTTP headers. Values above `60000` and values above the request timeout are clamped; Node returns `408` when this expires. |
 | `SERVER_MAX_HEADER_SIZE_BYTES` | `16384` | Maximum incoming request-header bytes. Values above `65536` are clamped; oversized headers return `431` and increment `header_overflow`. |
+| `SERVER_TRANSPORT_LOG_BURST` | `10` | Maximum warning logs per fixed transport event label during one window. Values above `100` are clamped; all events remain metriced. |
+| `SERVER_TRANSPORT_LOG_WINDOW_MS` | `60000` | Window for the per-event transport warning budget. Values above `300000` ms are clamped. |
 | `SERVER_KEEP_ALIVE_TIMEOUT_MS` | `5000` | Idle time after a response before the HTTP server closes a keep-alive socket. Values above `120000` are clamped. |
 | `SERVER_MAX_REQUESTS_PER_SOCKET` | `1000` | Maximum requests per keep-alive socket. Values above `10000` are clamped; set `0` only when a trusted proxy owns connection reuse. Node returns `503` beyond the cap. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
@@ -96,6 +98,14 @@ keep-alive sockets are closed after `SERVER_KEEP_ALIVE_TIMEOUT_MS`, and a socket
 `SERVER_MAX_REQUESTS_PER_SOCKET` requests. A reverse proxy may impose stricter limits, but should
 keep its request, header, and idle budgets compatible with these application settings.
 
+Warnings for malformed transport input and per-socket request drops use an independent budget per
+fixed event label. `SERVER_TRANSPORT_LOG_BURST` and `SERVER_TRANSPORT_LOG_WINDOW_MS` bound log
+volume without dropping telemetry: every event increments `news_http_server_events_total`, while
+suppressed warnings increment `news_http_server_log_suppressed_total`. The next warning after a
+window rollover reports only how many warnings were suppressed; raw packets, URLs, bodies, parser
+messages, and error objects are never logged. Set `LOG_LEVEL=silent` or a level above `warn` to
+disable these warning logs without changing the event counters.
+
 Transport failures that occur before Express middleware are counted by
 `news_http_server_events_total`. The application preserves Node's protocol responses for malformed
 requests (`400`), request/header timeouts (`408`), oversized headers (`431`), and oversized chunk
@@ -124,6 +134,7 @@ approximately ten-percent trace sample while preserving parent decisions.
 |--------|--------|---------|
 | `http_requests_total` | `method`, `status_code` | HTTP response count. |
 | `news_http_server_events_total` | `event=client_error|request_timeout|header_overflow|chunk_extensions_overflow|dropped_request` | Pre-Express parser errors and requests dropped after the per-socket request cap. |
+| `news_http_server_log_suppressed_total` | `event=client_error|request_timeout|header_overflow|chunk_extensions_overflow|dropped_request` | Transport warning logs skipped after the per-event burst budget was exhausted. |
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale|delete|delete_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, skipping stale fallback, or failing to quarantine a corrupt entry. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |

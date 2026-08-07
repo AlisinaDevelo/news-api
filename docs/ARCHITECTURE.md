@@ -95,7 +95,10 @@ and the graceful drain `SHUTDOWN_TIMEOUT_MS`; a reverse
 proxy can use stricter values but should keep the budgets deliberate. The runtime HTTP adapter
 also observes Node's `clientError` and `dropRequest` events before Express can see a request. It
 uses fixed event labels, reproduces Node's 400/408/431/413 responses, and closes the socket after
-handling a parser error so instrumentation does not weaken the default transport behavior.
+handling a parser error so instrumentation does not weaken the default transport behavior. Warning
+logs are rate-limited per event label by `SERVER_TRANSPORT_LOG_BURST` and
+`SERVER_TRANSPORT_LOG_WINDOW_MS`; event counts remain complete and warning suppression is exposed
+through `news_http_server_log_suppressed_total`.
 
 ## Errors
 
