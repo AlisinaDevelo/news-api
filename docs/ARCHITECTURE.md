@@ -91,7 +91,10 @@ The application server has explicit limits for incomplete requests and connectio
 receipt of the complete request, `SERVER_KEEP_ALIVE_TIMEOUT_MS` retires idle connections, and
 `SERVER_MAX_REQUESTS_PER_SOCKET` limits connection reuse. These controls are separate from the
 provider's `UPSTREAM_TOTAL_TIMEOUT_MS` and the graceful drain `SHUTDOWN_TIMEOUT_MS`; a reverse
-proxy can use stricter values but should keep the budgets deliberate.
+proxy can use stricter values but should keep the budgets deliberate. The runtime HTTP adapter
+also observes Node's `clientError` and `dropRequest` events before Express can see a request. It
+uses fixed event labels, reproduces Node's 400/408/431/413 responses, and closes the socket after
+handling a parser error so instrumentation does not weaken the default transport behavior.
 
 ## Errors
 
@@ -135,4 +138,4 @@ protect the span names, bounded attributes, and PII boundary.
 
 ## Metrics
 
-`src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts, while `newsService` and the provider adapter record cache hits/misses/errors/coalesced/stale misses, upstream request outcomes, upstream latency buckets, and circuit breaker events.
+`src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts, the runtime HTTP adapter records pre-Express transport events, while `newsService` and the provider adapter record cache hits/misses/errors/coalesced/stale misses, upstream request outcomes, upstream latency buckets, and circuit breaker events.

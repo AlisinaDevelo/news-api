@@ -96,4 +96,7 @@ that deadline; the image declares `STOPSIGNAL SIGTERM` explicitly.
 Keep the platform or reverse-proxy request timeout above `SERVER_REQUEST_TIMEOUT_MS` and
 `UPSTREAM_TOTAL_TIMEOUT_MS` so the application can return its normal structured errors. Proxy
 header and keep-alive limits may be stricter, but should be intentional and documented alongside
-the application settings.
+the application settings. Transport-level parser errors and requests rejected after the socket
+request cap are still visible through `news_http_server_events_total`, even though they bypass
+Express request middleware; the application preserves Node's 400/408/431/413 responses and
+closes affected sockets.

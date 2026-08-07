@@ -9,7 +9,7 @@ A search runs through a small, explicit pipeline — each stage is a separate, t
 1. **Validate** — query params are checked before any network call: `query`, source, and title text are required and capped at 256 characters, `count` and `page` must be positive integers and are bounded (≤100), `lang`/`country` must be ISO two-letter codes, `from`/`to` must parse as ISO 8601, and `sortBy` ∈ {`publishedAt`, `relevance`}. Bad input fails fast with `400` instead of wasting an upstream call or quota.
 2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set). Cache failures are logged/metriced but do not fail article requests; identical in-flight misses share one upstream call per process, and Redis-backed replicas coordinate cold misses with a renewable bounded lease.
 3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502`, and repeated failures open a short circuit that returns `503` without amplifying the outage. Recovery admits one half-open probe at a time.
-4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss/stale fallback/coalescing/cancellation, upstream outcome, latency histogram), and optional OpenTelemetry spans.
+4. **Observe** — each step emits structured Pino logs (carrying `x-request-id`), Prometheus counters (cache hit/miss/stale fallback/coalescing/cancellation, upstream outcome, transport events, latency histogram), and optional OpenTelemetry spans.
 5. **Respond** — legacy endpoints return raw article arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with request/cache metadata, `X-API-Version`, cache-status headers for searches, and structured error bodies.
 
 Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -18,7 +18,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 
 - **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting with draft-8 standard headers and shared Redis quotas, optional `TRUST_PROXY` for correct client IPs behind a load balancer, optional **`CLIENT_API_KEYS`** + `X-API-Key` on `/api/*`.
 - **Reliability:** Per-attempt and total upstream deadlines, explicit HTTP request/header/keep-alive/socket limits, response validation, bounded cache capacity, stale-on-error cache fallback, disconnect-aware cancellation, renewable owner-safe Redis cache-miss leases across replicas, bounded fail-fast Redis cache and rate-limit commands during reconnects, gzip compression for responses at or above 1 KiB, `502` for provider/transport failures, provider circuit breaker with `503` short-circuiting, graceful shutdown on `SIGTERM` / `SIGINT`.
-- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss/stale/error/coalescing/coordination/eviction + request cancellation + rate-limit store + upstream latency/circuit metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`) with low-cardinality search, cache, retry, circuit, upstream, and stale-fallback spans.
+- **Observability:** JSON logs via [Pino](https://getpino.io/), `x-request-id`, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss/stale/error/coalescing/coordination/eviction + request cancellation + rate-limit store + upstream latency/circuit + pre-Express transport-event metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`) with low-cardinality search, cache, retry, circuit, upstream, and stale-fallback spans.
 - **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured; `503` while draining).
 - **Supply chain:** `npm audit` in CI; **SPDX SBOM** artifacts; Docker builds with **SBOM + provenance**; **dependency review** on PRs; optional **SLSA-style lockfile attestation** on `main`; lockfile-only installs.
 - **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
@@ -95,7 +95,7 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 | `GET` | `/health` | Liveness: `{ "status": "ok", "uptime": number }`. |
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` is missing or the process is draining (non-test). |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
-| `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, cache hit/miss/stale/error/coalescing counts, and upstream latency. |
+| `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, pre-Express transport events, cache hit/miss/stale/error/coalescing counts, and upstream latency. |
 | `GET` | `/api/v1/articles` | Versioned search. Returns `{ data, meta }`, including `count`, `page`, normalized filters, cache status, and `requestId`. |
 | `GET` | `/api/v1/articles/search` | Alias for versioned search. |
 | `GET` | `/api/v1/articles/title/:title` | Exact title match with `{ data, meta }`, else structured `404`. |
@@ -149,7 +149,7 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses
 - `src/http/responses.ts` — Versioned response envelope helpers.
 - `src/client/` — OpenAPI-generated TypeScript types and small v1 client wrapper.
 - `src/cache/store.ts` — Pluggable cache: memory or Redis.
-- `src/metrics/register.ts` — Prometheus registry: HTTP, cache, and upstream provider metrics.
+- `src/metrics/register.ts` — Prometheus registry: HTTP, transport, cache, and upstream provider metrics.
 - `src/providers/gnewsProvider.ts` — GNews adapter: provider params, payload validation, timeouts, upstream instrumentation.
 - `src/services/newsService.ts` — Article search orchestration: normalized cache keys, cache resilience/coalescing, title/source narrowing.
 - `test/` — Vitest; HTTP tests mock `axios` (no live GNews in CI), including OpenAPI-backed response contract checks.

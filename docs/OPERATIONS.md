@@ -94,6 +94,13 @@ keep-alive sockets are closed after `SERVER_KEEP_ALIVE_TIMEOUT_MS`, and a socket
 `SERVER_MAX_REQUESTS_PER_SOCKET` requests. A reverse proxy may impose stricter limits, but should
 keep its request and idle budgets compatible with these application settings.
 
+Transport failures that occur before Express middleware are counted by
+`news_http_server_events_total`. The application preserves Node's protocol responses for malformed
+requests (`400`), request/header timeouts (`408`), oversized headers (`431`), and oversized chunk
+extensions (`413`), then closes the affected socket. Requests beyond the per-socket limit receive
+Node's `503` response and increment the `dropped_request` event. These events do not include raw
+request bytes, URLs, bodies, or error messages.
+
 ## Tracing
 
 Set `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` to enable OTLP export.
@@ -114,6 +121,7 @@ approximately ten-percent trace sample while preserving parent decisions.
 | Metric | Labels | Purpose |
 |--------|--------|---------|
 | `http_requests_total` | `method`, `status_code` | HTTP response count. |
+| `news_http_server_events_total` | `event=client_error|request_timeout|header_overflow|chunk_extensions_overflow|dropped_request` | Pre-Express parser errors and requests dropped after the per-socket request cap. |
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale|delete|delete_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, skipping stale fallback, or failing to quarantine a corrupt entry. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |
