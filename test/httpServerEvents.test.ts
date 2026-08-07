@@ -7,6 +7,10 @@ import {
   instrumentHttpServer,
 } from "../src/runtime/httpServerEvents";
 import { httpServerEventsTotal, register } from "../src/metrics/register";
+import {
+  createConfiguredHttpServer,
+  resolveHttpServerSettings,
+} from "../src/config/httpServer";
 import type { Duplex } from "node:stream";
 
 function errorWithCode(code: string): Error {
@@ -146,6 +150,30 @@ describe("HTTP server transport events", () => {
       expect(server.listenerCount("dropRequest")).toBe(1);
       expect(await register.metrics()).toContain(
         'news_http_server_events_total{event="client_error"} 1'
+      );
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("returns 431 and counts an oversized request header", async () => {
+    const server = instrumentHttpServer(
+      createConfiguredHttpServer((_req, res) => res.end("ok"), {
+        ...resolveHttpServerSettings(),
+        maxHeaderSize: 1_024,
+      })
+    );
+    const port = await listen(server);
+
+    try {
+      const response = await rawRequest(
+        port,
+        `GET / HTTP/1.1\r\nHost: localhost\r\nX-Large: ${"x".repeat(2_000)}\r\n\r\n`
+      );
+
+      expect(response).toContain("HTTP/1.1 431 Request Header Fields Too Large");
+      expect(await register.metrics()).toContain(
+        'news_http_server_events_total{event="header_overflow"} 1'
       );
     } finally {
       await close(server);

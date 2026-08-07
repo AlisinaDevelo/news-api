@@ -1,4 +1,4 @@
-import type { Server } from "node:http";
+import { createServer, type RequestListener, type Server } from "node:http";
 import { resolveNonNegativeIntegerEnv, resolvePositiveIntegerEnv } from "./numbers";
 
 export const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 75_000;
@@ -9,6 +9,8 @@ export const DEFAULT_SERVER_KEEP_ALIVE_TIMEOUT_MS = 5_000;
 export const MAX_SERVER_KEEP_ALIVE_TIMEOUT_MS = 120_000;
 export const DEFAULT_SERVER_MAX_REQUESTS_PER_SOCKET = 1_000;
 export const MAX_SERVER_MAX_REQUESTS_PER_SOCKET = 10_000;
+export const DEFAULT_SERVER_MAX_HEADER_SIZE_BYTES = 16_384;
+export const MAX_SERVER_MAX_HEADER_SIZE_BYTES = 65_536;
 
 export function resolveServerRequestTimeoutMs(
   rawValue = process.env.SERVER_REQUEST_TIMEOUT_MS
@@ -49,11 +51,22 @@ export function resolveServerMaxRequestsPerSocket(
   );
 }
 
+export function resolveServerMaxHeaderSizeBytes(
+  rawValue = process.env.SERVER_MAX_HEADER_SIZE_BYTES
+): number {
+  return resolvePositiveIntegerEnv(
+    rawValue,
+    DEFAULT_SERVER_MAX_HEADER_SIZE_BYTES,
+    MAX_SERVER_MAX_HEADER_SIZE_BYTES
+  );
+}
+
 export interface HttpServerSettings {
   requestTimeout: number;
   headersTimeout: number;
   keepAliveTimeout: number;
   maxRequestsPerSocket: number;
+  maxHeaderSize: number;
 }
 
 export function resolveHttpServerSettings(): HttpServerSettings {
@@ -63,6 +76,7 @@ export function resolveHttpServerSettings(): HttpServerSettings {
     headersTimeout: resolveServerHeadersTimeoutMs(undefined, requestTimeout),
     keepAliveTimeout: resolveServerKeepAliveTimeoutMs(),
     maxRequestsPerSocket: resolveServerMaxRequestsPerSocket(),
+    maxHeaderSize: resolveServerMaxHeaderSizeBytes(),
   };
 }
 
@@ -75,4 +89,14 @@ export function configureHttpServer(
   server.keepAliveTimeout = settings.keepAliveTimeout;
   server.maxRequestsPerSocket = settings.maxRequestsPerSocket;
   return server;
+}
+
+export function createConfiguredHttpServer(
+  requestListener: RequestListener,
+  settings = resolveHttpServerSettings()
+): Server {
+  return configureHttpServer(
+    createServer({ maxHeaderSize: settings.maxHeaderSize }, requestListener),
+    settings
+  );
 }
