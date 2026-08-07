@@ -11,6 +11,10 @@ export const DEFAULT_SERVER_MAX_REQUESTS_PER_SOCKET = 1_000;
 export const MAX_SERVER_MAX_REQUESTS_PER_SOCKET = 10_000;
 export const DEFAULT_SERVER_MAX_HEADER_SIZE_BYTES = 16_384;
 export const MAX_SERVER_MAX_HEADER_SIZE_BYTES = 65_536;
+export const DEFAULT_SERVER_TRANSPORT_LOG_BURST = 10;
+export const MAX_SERVER_TRANSPORT_LOG_BURST = 100;
+export const DEFAULT_SERVER_TRANSPORT_LOG_WINDOW_MS = 60_000;
+export const MAX_SERVER_TRANSPORT_LOG_WINDOW_MS = 300_000;
 
 export function resolveServerRequestTimeoutMs(
   rawValue = process.env.SERVER_REQUEST_TIMEOUT_MS
@@ -61,12 +65,37 @@ export function resolveServerMaxHeaderSizeBytes(
   );
 }
 
+export function resolveServerTransportLogBurst(
+  rawValue = process.env.SERVER_TRANSPORT_LOG_BURST
+): number {
+  return resolvePositiveIntegerEnv(
+    rawValue,
+    DEFAULT_SERVER_TRANSPORT_LOG_BURST,
+    MAX_SERVER_TRANSPORT_LOG_BURST
+  );
+}
+
+export function resolveServerTransportLogWindowMs(
+  rawValue = process.env.SERVER_TRANSPORT_LOG_WINDOW_MS
+): number {
+  return resolvePositiveIntegerEnv(
+    rawValue,
+    DEFAULT_SERVER_TRANSPORT_LOG_WINDOW_MS,
+    MAX_SERVER_TRANSPORT_LOG_WINDOW_MS
+  );
+}
+
 export interface HttpServerSettings {
   requestTimeout: number;
   headersTimeout: number;
   keepAliveTimeout: number;
   maxRequestsPerSocket: number;
   maxHeaderSize: number;
+}
+
+export interface HttpServerLogSettings {
+  burst: number;
+  windowMs: number;
 }
 
 export function resolveHttpServerSettings(): HttpServerSettings {
@@ -77,6 +106,13 @@ export function resolveHttpServerSettings(): HttpServerSettings {
     keepAliveTimeout: resolveServerKeepAliveTimeoutMs(),
     maxRequestsPerSocket: resolveServerMaxRequestsPerSocket(),
     maxHeaderSize: resolveServerMaxHeaderSizeBytes(),
+  };
+}
+
+export function resolveHttpServerLogSettings(): HttpServerLogSettings {
+  return {
+    burst: resolveServerTransportLogBurst(),
+    windowMs: resolveServerTransportLogWindowMs(),
   };
 }
 

@@ -5,12 +5,19 @@ import {
   createConfiguredHttpServer,
   DEFAULT_SERVER_MAX_HEADER_SIZE_BYTES,
   MAX_SERVER_MAX_HEADER_SIZE_BYTES,
+  DEFAULT_SERVER_TRANSPORT_LOG_BURST,
+  DEFAULT_SERVER_TRANSPORT_LOG_WINDOW_MS,
+  MAX_SERVER_TRANSPORT_LOG_BURST,
+  MAX_SERVER_TRANSPORT_LOG_WINDOW_MS,
   resolveHttpServerSettings,
+  resolveHttpServerLogSettings,
   resolveServerHeadersTimeoutMs,
   resolveServerKeepAliveTimeoutMs,
   resolveServerMaxHeaderSizeBytes,
   resolveServerMaxRequestsPerSocket,
   resolveServerRequestTimeoutMs,
+  resolveServerTransportLogBurst,
+  resolveServerTransportLogWindowMs,
 } from "../src/config/httpServer";
 
 describe("HTTP server configuration", () => {
@@ -20,6 +27,12 @@ describe("HTTP server configuration", () => {
     expect(resolveServerKeepAliveTimeoutMs(undefined)).toBe(5_000);
     expect(resolveServerMaxRequestsPerSocket(undefined)).toBe(1_000);
     expect(resolveServerMaxHeaderSizeBytes(undefined)).toBe(DEFAULT_SERVER_MAX_HEADER_SIZE_BYTES);
+    expect(resolveServerTransportLogBurst(undefined)).toBe(DEFAULT_SERVER_TRANSPORT_LOG_BURST);
+    expect(resolveServerTransportLogWindowMs(undefined)).toBe(DEFAULT_SERVER_TRANSPORT_LOG_WINDOW_MS);
+    expect(resolveHttpServerLogSettings()).toEqual({
+      burst: DEFAULT_SERVER_TRANSPORT_LOG_BURST,
+      windowMs: DEFAULT_SERVER_TRANSPORT_LOG_WINDOW_MS,
+    });
     expect(resolveHttpServerSettings()).toEqual({
       requestTimeout: 75_000,
       headersTimeout: 10_000,
@@ -43,6 +56,11 @@ describe("HTTP server configuration", () => {
     expect(resolveServerMaxHeaderSizeBytes("0")).toBe(DEFAULT_SERVER_MAX_HEADER_SIZE_BYTES);
     expect(resolveServerMaxHeaderSizeBytes("1.5")).toBe(DEFAULT_SERVER_MAX_HEADER_SIZE_BYTES);
     expect(resolveServerMaxHeaderSizeBytes("900000")).toBe(MAX_SERVER_MAX_HEADER_SIZE_BYTES);
+    expect(resolveServerTransportLogBurst("nope")).toBe(DEFAULT_SERVER_TRANSPORT_LOG_BURST);
+    expect(resolveServerTransportLogBurst("0")).toBe(DEFAULT_SERVER_TRANSPORT_LOG_BURST);
+    expect(resolveServerTransportLogBurst("900000")).toBe(MAX_SERVER_TRANSPORT_LOG_BURST);
+    expect(resolveServerTransportLogWindowMs("1.5")).toBe(DEFAULT_SERVER_TRANSPORT_LOG_WINDOW_MS);
+    expect(resolveServerTransportLogWindowMs("900000")).toBe(MAX_SERVER_TRANSPORT_LOG_WINDOW_MS);
   });
 
   it("applies settings to the actual Node HTTP server", () => {

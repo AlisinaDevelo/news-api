@@ -18,6 +18,13 @@ export const httpServerEventsTotal = new Counter({
   registers: [register],
 });
 
+export const httpServerLogSuppressedTotal = new Counter({
+  name: "news_http_server_log_suppressed_total",
+  help: "Total HTTP transport warning logs suppressed by the per-event budget",
+  labelNames: ["event"],
+  registers: [register],
+});
+
 export const cacheEventsTotal = new Counter({
   name: "news_cache_events_total",
   help: "Total news search cache lookups by result",

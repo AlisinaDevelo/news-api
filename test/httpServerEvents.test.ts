@@ -1,12 +1,18 @@
 import { createServer, type Server } from "node:http";
 import { connect, type Socket } from "node:net";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   classifyHttpClientError,
   handleHttpClientError,
+  HttpServerLogLimiter,
   instrumentHttpServer,
 } from "../src/runtime/httpServerEvents";
-import { httpServerEventsTotal, register } from "../src/metrics/register";
+import { logger } from "../src/logger";
+import {
+  httpServerEventsTotal,
+  httpServerLogSuppressedTotal,
+  register,
+} from "../src/metrics/register";
 import {
   createConfiguredHttpServer,
   resolveHttpServerSettings,
@@ -95,10 +101,12 @@ function rawRequest(port: number, payload: string): Promise<string> {
 describe("HTTP server transport events", () => {
   beforeEach(() => {
     httpServerEventsTotal.reset();
+    httpServerLogSuppressedTotal.reset();
   });
 
   afterEach(() => {
     httpServerEventsTotal.reset();
+    httpServerLogSuppressedTotal.reset();
   });
 
   it("classifies bounded parser error categories", () => {
@@ -112,6 +120,19 @@ describe("HTTP server transport events", () => {
       "chunk_extensions_overflow"
     );
     expect(classifyHttpClientError(errorWithCode("unexpected"))).toBe("client_error");
+  });
+
+  it("bounds each event category independently and reports rollover suppression", () => {
+    let now = 0;
+    const limiter = new HttpServerLogLimiter(2, 100, () => now);
+
+    expect(limiter.take("client_error")).toEqual({ emit: true, suppressed: 0 });
+    expect(limiter.take("client_error")).toEqual({ emit: true, suppressed: 0 });
+    expect(limiter.take("client_error")).toEqual({ emit: false, suppressed: 0 });
+    expect(limiter.take("header_overflow")).toEqual({ emit: true, suppressed: 0 });
+
+    now = 100;
+    expect(limiter.take("client_error")).toEqual({ emit: true, suppressed: 1 });
   });
 
   it.each([
@@ -152,6 +173,33 @@ describe("HTTP server transport events", () => {
         'news_http_server_events_total{event="client_error"} 1'
       );
     } finally {
+      await close(server);
+    }
+  });
+
+  it("keeps event metrics complete while suppressing warning-log bursts", async () => {
+    const previousLevel = logger.level;
+    logger.level = "warn";
+    const warning = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const server = instrumentHttpServer(createServer((_req, res) => res.end("ok")), {
+      burst: 1,
+      windowMs: 60_000,
+    });
+    const port = await listen(server);
+
+    try {
+      await rawRequest(port, "not-http\r\n\r\n");
+      await rawRequest(port, "not-http\r\n\r\n");
+
+      const metrics = await register.metrics();
+      expect(metrics).toContain('news_http_server_events_total{event="client_error"} 2');
+      expect(metrics).toContain(
+        'news_http_server_log_suppressed_total{event="client_error"} 1'
+      );
+      expect(warning).toHaveBeenCalledTimes(1);
+    } finally {
+      warning.mockRestore();
+      logger.level = previousLevel;
       await close(server);
     }
   });
