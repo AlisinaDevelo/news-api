@@ -86,11 +86,12 @@ to the shared store drawn above.
 
 ## HTTP transport
 
-The application server has explicit limits for incomplete requests and connection reuse:
+The application server has explicit limits for incomplete requests, header size, and connection reuse:
 `SERVER_HEADERS_TIMEOUT_MS` protects slow header delivery, `SERVER_REQUEST_TIMEOUT_MS` bounds
-receipt of the complete request, `SERVER_KEEP_ALIVE_TIMEOUT_MS` retires idle connections, and
-`SERVER_MAX_REQUESTS_PER_SOCKET` limits connection reuse. These controls are separate from the
-provider's `UPSTREAM_TOTAL_TIMEOUT_MS` and the graceful drain `SHUTDOWN_TIMEOUT_MS`; a reverse
+receipt of the complete request, `SERVER_MAX_HEADER_SIZE_BYTES` bounds incoming header bytes,
+`SERVER_KEEP_ALIVE_TIMEOUT_MS` retires idle connections, and `SERVER_MAX_REQUESTS_PER_SOCKET`
+limits connection reuse. These controls are separate from the provider's `UPSTREAM_TOTAL_TIMEOUT_MS`
+and the graceful drain `SHUTDOWN_TIMEOUT_MS`; a reverse
 proxy can use stricter values but should keep the budgets deliberate. The runtime HTTP adapter
 also observes Node's `clientError` and `dropRequest` events before Express can see a request. It
 uses fixed event labels, reproduces Node's 400/408/431/413 responses, and closes the socket after

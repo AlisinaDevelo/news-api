@@ -25,6 +25,7 @@
 | `UPSTREAM_CIRCUIT_COOLDOWN_MS` | `30000` | How long to short-circuit provider calls after the circuit opens (max `300000`). Only one recovery probe is allowed after cooldown. |
 | `SERVER_REQUEST_TIMEOUT_MS` | `75000` | Maximum time to receive a complete incoming HTTP request. Values above `120000` are clamped; keep it above `UPSTREAM_TOTAL_TIMEOUT_MS` when provider work can run to its budget. Node returns `408` when this expires. |
 | `SERVER_HEADERS_TIMEOUT_MS` | `10000` | Maximum time to receive complete HTTP headers. Values above `60000` and values above the request timeout are clamped; Node returns `408` when this expires. |
+| `SERVER_MAX_HEADER_SIZE_BYTES` | `16384` | Maximum incoming request-header bytes. Values above `65536` are clamped; oversized headers return `431` and increment `header_overflow`. |
 | `SERVER_KEEP_ALIVE_TIMEOUT_MS` | `5000` | Idle time after a response before the HTTP server closes a keep-alive socket. Values above `120000` are clamped. |
 | `SERVER_MAX_REQUESTS_PER_SOCKET` | `1000` | Maximum requests per keep-alive socket. Values above `10000` are clamped; set `0` only when a trusted proxy owns connection reuse. Node returns `503` beyond the cap. |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | Force-exit if `server.close` does not finish. |
@@ -89,10 +90,11 @@ On shutdown the server closes the cache and rate-limit Redis connections when th
 
 The production HTTP server applies explicit transport limits. `SERVER_REQUEST_TIMEOUT_MS` covers
 receiving the request body, while `UPSTREAM_TOTAL_TIMEOUT_MS` covers provider work after routing;
-the request setting should remain slightly higher. Header parsing has its own shorter budget, idle
+the request setting should remain slightly higher. Header parsing has its own shorter budget, and
+`SERVER_MAX_HEADER_SIZE_BYTES` bounds the bytes the Node parser accepts before Express. Idle
 keep-alive sockets are closed after `SERVER_KEEP_ALIVE_TIMEOUT_MS`, and a socket is retired after
 `SERVER_MAX_REQUESTS_PER_SOCKET` requests. A reverse proxy may impose stricter limits, but should
-keep its request and idle budgets compatible with these application settings.
+keep its request, header, and idle budgets compatible with these application settings.
 
 Transport failures that occur before Express middleware are counted by
 `news_http_server_events_total`. The application preserves Node's protocol responses for malformed

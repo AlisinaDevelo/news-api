@@ -22,6 +22,7 @@ Set these variables on the hosting platform:
 | `RATE_LIMIT_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Shared rate-limit Redis connection budget; values above `5000` ms are clamped. |
 | `SERVER_REQUEST_TIMEOUT_MS` | `75000` | Complete incoming request budget; keep above `UPSTREAM_TOTAL_TIMEOUT_MS`. Values above `120000` ms are clamped. |
 | `SERVER_HEADERS_TIMEOUT_MS` | `10000` | Slow-header protection; values above `60000` ms and above the request budget are clamped. |
+| `SERVER_MAX_HEADER_SIZE_BYTES` | `16384` | Incoming request-header byte budget; values above `65536` are clamped and oversized headers return `431`. |
 | `SERVER_KEEP_ALIVE_TIMEOUT_MS` | `5000` | Idle keep-alive socket budget. Values above `120000` ms are clamped. |
 | `SERVER_MAX_REQUESTS_PER_SOCKET` | `1000` | Maximum requests per connection; set `0` only when a trusted proxy owns connection reuse. |
 | `CACHE_LEASE_TTL_MS` | `5000` | Short cross-replica cache-miss lease; only active with managed Redis. |
