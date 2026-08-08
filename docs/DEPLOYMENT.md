@@ -2,6 +2,10 @@
 
 This service is safe to deploy as a small read-only portfolio demo, but it still spends GNews quota. For public links, prefer a low rate limit plus `CLIENT_API_KEYS` for `/api/*`; leave `/health`, `/ready`, `/openapi.yaml`, and `/metrics` available for inspection.
 
+The production Dockerfile uses reviewed tag-plus-manifest-digest base images. Dependabot's weekly
+Docker updates should be treated as normal dependency changes and verified with
+`npm run container:check`, the Docker build, and the Compose smoke before deployment.
+
 ## Production environment
 
 Set these variables on the hosting platform:

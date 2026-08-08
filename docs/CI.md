@@ -7,31 +7,33 @@
 The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.js 20 and 22**:
 
 1. **`npm ci`** — reproducible install from `package-lock.json`.
-2. **`npm audit --audit-level=high`** — fails the job if high or critical advisories remain.
-3. **`npm run lint`** — [ESLint](https://eslint.org/) on `src/`, `test/`, and `vitest.config.ts`.
-4. **`npm run contract`** — [Redocly CLI](https://redocly.com/docs/cli) validates `docs/openapi.yaml` so the published API contract stays parseable and policy-compliant.
-5. **`npm run client:check`** — regenerates OpenAPI TypeScript client types and fails if checked-in generated output is stale.
-6. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions. Response contract tests compile selected `docs/openapi.yaml` schemas and validate real HTTP responses.
-7. **`npm run test:coverage`** — **Node 22 only**; enforces global minimums of **80% statements, 80% lines, 80% functions, and 75% branches**, then uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
-8. **[Codecov](https://codecov.io)** — **Node 22 only**; uploads `coverage/lcov.info`. For private repos set repository secret `CODECOV_TOKEN`. `fail_ci_if_error` is off so missing token does not break the build.
-9. **`npm run build`** — TypeScript compile to `dist/`.
+2. **`npm run workflow:check`** — **Node 20 only**; rejects mutable, abbreviated, or non-upstream-pinned GitHub Action references.
+3. **`npm run container:check`** — **Node 20 only**; rejects tag-only Dockerfile and Compose image references.
+4. **`npm audit --audit-level=high`** — fails the job if high or critical advisories remain.
+5. **`npm run lint`** — [ESLint](https://eslint.org/) on `src/`, `test/`, and `vitest.config.ts`.
+6. **`npm run contract`** — [Redocly CLI](https://redocly.com/docs/cli) validates `docs/openapi.yaml` so the published API contract stays parseable and policy-compliant.
+7. **`npm run client:check`** — regenerates OpenAPI TypeScript client types and fails if checked-in generated output is stale.
+8. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions. Response contract tests compile selected `docs/openapi.yaml` schemas and validate real HTTP responses.
+9. **`npm run test:coverage`** — **Node 22 only**; enforces global minimums of **80% statements, 80% lines, 80% functions, and 75% branches**, then uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
+10. **[Codecov](https://codecov.io)** — **Node 22 only**; uploads `coverage/lcov.info`. For private repos set repository secret `CODECOV_TOKEN`. `fail_ci_if_error` is off so missing token does not break the build.
+11. **`npm run build`** — TypeScript compile to `dist/`.
 
 ### Container (`docker` job)
 
-10. **`npm run smoke:docker`** — Compose boots Redis, the production image, a slow GNews-compatible fake provider, and two rate-limited API replicas. It proves shared quotas and cross-replica cold-miss coordination, runs the HTTP smoke, then stops Redis to verify strict replicas become unready while liveness and the cache-only replica remain healthy. Redis restart must restore readiness without restarting the APIs.
-11. **Buildx build** — [Dockerfile](../Dockerfile) with **`provenance: mode=max`** and **SBOM** (no registry push). Validates supply-chain metadata generation in CI.
+12. **`npm run smoke:docker`** — Compose boots Redis, the production image, a slow GNews-compatible fake provider, and two rate-limited API replicas. It proves shared quotas and cross-replica cold-miss coordination, runs the HTTP smoke, then stops Redis to verify strict replicas become unready while liveness and the cache-only replica remain healthy. Redis restart must restore readiness without restarting the APIs.
+13. **Buildx build** — [Dockerfile](../Dockerfile) with **`provenance: mode=max`** and **SBOM** (no registry push). Validates supply-chain metadata generation in CI.
 
 ### Pull requests only
 
-12. **[Dependency review](../.github/workflows/dependency-review.yml)** — flags vulnerable or blocked dependencies introduced by the PR.
+14. **[Dependency review](../.github/workflows/dependency-review.yml)** — flags vulnerable or blocked dependencies introduced by the PR.
 
 ### Every push / PR (supply chain)
 
-13. **[SBOM](../.github/workflows/supply-chain.yml)** — [Anchore SBOM Action](https://github.com/anchore/sbom-action) produces SPDX JSON and uploads it as a workflow artifact.
+15. **[SBOM](../.github/workflows/supply-chain.yml)** — [Anchore SBOM Action](https://github.com/anchore/sbom-action) produces SPDX JSON and uploads it as a workflow artifact.
 
 ### `main` branch pushes only
 
-14. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json`; the `main` workflow fails if the attestation cannot be produced.
+16. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json`; the `main` workflow fails if the attestation cannot be produced.
 
 ### Code scanning (`CodeQL` workflow)
 
@@ -54,11 +56,25 @@ access and rejects tags, branches, abbreviated SHAs, or other mutable references
 job runs the same guard. When updating an action, resolve the new release tag in the upstream
 repository, verify the full SHA, update the release comment, and run the guard before pushing.
 
+### Container image supply chain
+
+Every external `FROM` and Compose `image:` reference keeps its human-readable tag and a full
+manifest digest, for example `node:22-alpine@sha256:...`. Tags are useful maintenance context;
+the digest is the reproducible input used by Docker. `npm run container:check` checks the tracked
+Dockerfile and Compose files without network access and runs in the Node 20 CI job. When Dependabot
+opens a Docker update, review the tag and digest together, run the full Docker build and Compose
+smoke, and treat the digest change as a normal dependency change.
+
+This follows Docker's [Dockerfile `FROM` reference](https://docs.docker.com/reference/dockerfile/),
+[digest guidance](https://docs.docker.com/reference/cli/docker/image/pull/), and
+[Compose trust model](https://docs.docker.com/compose/trust-model/).
+
 ## Local parity
 
 ```bash
 npm ci
 npm run workflow:check
+npm run container:check
 npm audit --audit-level=high
 npm run lint
 npm run contract
@@ -97,6 +113,7 @@ Download the **`coverage-lcov`** artifact from a workflow run to inspect HTML/LC
 | `npm ci` fails after lockfile change | Run `npm install` locally and commit the updated `package-lock.json`. |
 | `npm audit` fails in CI | Run `npm audit` locally; upgrade or patch dependencies, then commit the lockfile. |
 | Workflow action pin check fails | Replace the tag or abbreviated SHA with a verified full upstream commit SHA and keep the release comment current. |
+| Container image pin check fails | Replace a tag-only Dockerfile or Compose image with the reviewed tag-plus-digest reference; run `npm run container:check`. |
 | Tests pass locally but fail in CI | Align Node version with the matrix; avoid relying on local-only env vars. |
 | Docker job fails | Ensure the Dockerfile paths and `npm run build` still succeed after changes. |
 | Codecov shows no data | Add `CODECOV_TOKEN` for private repos or confirm the repository is linked on codecov.io. |

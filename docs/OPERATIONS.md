@@ -196,6 +196,17 @@ Use cache hit rate, coalesced miss counts, and coordination events to understand
 
 ## Docker
 
+The Dockerfile and both Compose files pin external images with a human-readable tag plus a full
+manifest digest. This keeps local and hosted builds on the same reviewed image index while leaving
+Dependabot a visible tag to update. Check the policy without a registry call:
+
+```bash
+npm run container:check
+```
+
+Review digest changes as dependency changes, then run the Docker build and Compose smoke before
+deploying.
+
 ```bash
 docker build -t news-api:local .
 docker run --rm -p 3000:3000 -e GNEWS_API_KEY=your_key news-api:local

@@ -19,6 +19,7 @@ Suggested rules:
 
 - **Dependabot** — enabled via [`.github/dependabot.yml`](../.github/dependabot.yml); review and merge security PRs promptly.
 - **Action updates** — retain the release-version comment beside each SHA pin, verify the new SHA comes from the intended upstream action repository, and run the workflow pin guard before merging.
+- **Container updates** — retain the human-readable tag beside each Docker image digest, review Dependabot's Docker digest refresh as a dependency change, and run `npm run container:check` plus the Docker build and Compose smoke before merging.
 - **Code scanning** — [CodeQL workflow](../.github/workflows/codeql.yml) uploads results to the **Security** tab.
 - **Secrets** — store `GNEWS_API_KEY` and similar only in **Actions secrets** or your deployment environment, never in workflow YAML.
 
