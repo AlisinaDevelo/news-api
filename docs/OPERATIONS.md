@@ -106,6 +106,13 @@ window rollover reports only how many warnings were suppressed; raw packets, URL
 messages, and error objects are never logged. Set `LOG_LEVEL=silent` or a level above `warn` to
 disable these warning logs without changing the event counters.
 
+HTTP access logs use an explicit privacy allowlist. They retain the normalized request ID, method,
+pathname (capped at 512 bytes), response status, and response time. They do not retain request
+headers, query strings, request bodies, remote address/port, or arbitrary request objects. Client
+`X-Request-Id` values must be 1-128 ASCII characters from `A-Z`, `a-z`, `0-9`, `.`, `_`, `:`, `/`,
+`~`, or `-`; invalid or oversized values are replaced with a generated UUID and increment
+`news_request_id_rejections_total`.
+
 Transport failures that occur before Express middleware are counted by
 `news_http_server_events_total`. The application preserves Node's protocol responses for malformed
 requests (`400`), request/header timeouts (`408`), oversized headers (`431`), and oversized chunk
@@ -135,6 +142,7 @@ approximately ten-percent trace sample while preserving parent decisions.
 | `http_requests_total` | `method`, `status_code` | HTTP response count. |
 | `news_http_server_events_total` | `event=client_error|request_timeout|header_overflow|chunk_extensions_overflow|dropped_request` | Pre-Express parser errors and requests dropped after the per-socket request cap. |
 | `news_http_server_log_suppressed_total` | `event=client_error|request_timeout|header_overflow|chunk_extensions_overflow|dropped_request` | Transport warning logs skipped after the per-event burst budget was exhausted. |
+| `news_request_id_rejections_total` | — | Client request IDs rejected by the bounded HTTP logging boundary and replaced with generated IDs. |
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale|delete|delete_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, skipping stale fallback, or failing to quarantine a corrupt entry. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |

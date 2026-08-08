@@ -24,6 +24,7 @@ We aim to acknowledge reports within a few business days.
 - Set `TRUST_PROXY=1` only when the proxy strips or sanitizes `X-Forwarded-For`.
 - Keep `GNEWS_API_KEY` in a secret store; never commit `.env`.
 - If you use `CLIENT_API_KEYS`, rotate them like any API credential; prefer a secret manager over plain Deployment env in production.
+- Access logs use an allowlist and do not persist API keys, cookies, query strings, request bodies, or remote addresses. Invalid `X-Request-Id` values are replaced with generated IDs.
 - Tune `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, and `HTTP_TIMEOUT_MS` for your traffic profile.
 - Review [docs/OPERATIONS.md](docs/OPERATIONS.md) for runtime configuration.
 

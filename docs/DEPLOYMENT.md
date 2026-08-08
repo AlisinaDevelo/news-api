@@ -85,7 +85,7 @@ For a recruiter-facing public demo, the best default is:
 - Public: `/health`, `/ready`, `/openapi.yaml`, `/metrics`.
 - Protected with `CLIENT_API_KEYS`: `/api/articles`, `/api/articles/title/:title`, `/api/articles/source`.
 - Rate limited: `RATE_LIMIT_MAX=60` or lower until you know traffic is tiny.
-- Logs: `LOG_LEVEL=info`, with no API keys in logs or URLs.
+- Logs: `LOG_LEVEL=info`; access logs keep only a bounded request ID, method, pathname, status, and latency, with no API keys, cookies, request bodies, query strings, or remote addresses.
 
 That gives people something real to inspect without turning your GNews quota into a public vending machine.
 

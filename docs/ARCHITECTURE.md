@@ -14,7 +14,7 @@ flowchart LR
 ```
 
 1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented. `src/server.ts` creates a Node `http.Server` with explicit request/header/keep-alive/socket-reuse limits before listening.
-2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`; uses shared Redis quotas when configured), then mounts `/api` routes.
+2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), privacy-safe **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`; uses shared Redis quotas when configured), then mounts `/api` routes.
 3. **Controllers** validate query parameters, create a response-lifecycle abort signal, and map domain results to HTTP status codes.
 4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `page`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and when Redis is active coordinates cold misses with a short owner-token lease plus a half-TTL heartbeat during slow loads. It tracks each caller as a subscriber and delegates upstream fetches to the GNews provider adapter. A disconnected subscriber stops awaiting the shared promise; the shared provider is aborted only when no subscribers remain. Cache and lease backend errors are logged and metriced without failing the article request.
 5. **Provider adapter** composes the client signal with process shutdown and a cancelable total deadline, maps domain search options to GNews parameters, validates provider payloads, records upstream metrics, and opens a short circuit after repeated provider failures so outages are shed locally instead of amplified. Explicit cancellation is not retried, counted as a circuit failure, or served from stale fallback; total-budget exhaustion is a transient provider failure.
@@ -98,7 +98,9 @@ uses fixed event labels, reproduces Node's 400/408/431/413 responses, and closes
 handling a parser error so instrumentation does not weaken the default transport behavior. Warning
 logs are rate-limited per event label by `SERVER_TRANSPORT_LOG_BURST` and
 `SERVER_TRANSPORT_LOG_WINDOW_MS`; event counts remain complete and warning suppression is exposed
-through `news_http_server_log_suppressed_total`.
+through `news_http_server_log_suppressed_total`. Express access logs use an allowlist of normalized
+request ID, method, bounded pathname, response status, and response time; headers, query strings,
+bodies, remote address/port, and arbitrary request objects are excluded.
 
 ## Errors
 
