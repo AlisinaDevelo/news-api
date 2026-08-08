@@ -35,6 +35,7 @@ services:
       - "3000:3000"
     environment:
       GNEWS_API_KEY: ci
+      CLIENT_API_KEYS: ci-client
       GNEWS_BASE_URL: http://fake-gnews:4010
       PORT: "3000"
       NODE_ENV: production

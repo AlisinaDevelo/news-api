@@ -124,11 +124,66 @@ expect_api_response() {
     expect_header "$response_name cache status" "X-Cache-Status" "$response_expected_cache_status"
   fi
 
+  response_etag="$(header_value "ETag")"
+  if [ -z "$response_etag" ]; then
+    echo "FAIL $response_name: missing ETag header"
+    cat "$TMP_HEADERS"
+    exit 1
+  fi
+
   if [ -n "$response_expected_cache_status" ]; then
     echo "OK   $response_name ($response_status, cache=$response_expected_cache_status)"
   else
     echo "OK   $response_name ($response_status)"
   fi
+}
+
+expect_api_not_modified() {
+  response_name="$1"
+  response_url="$2"
+  response_etag="$3"
+
+  if [ -z "$response_etag" ]; then
+    echo "FAIL $response_name: cannot send an empty ETag"
+    exit 1
+  fi
+
+  : > "$TMP_BODY"
+
+  if [ -n "${CLIENT_API_KEY:-}" ]; then
+    response_status="$(curl -sS -D "$TMP_HEADERS" -H "X-API-Key: $CLIENT_API_KEY" -H "If-None-Match: $response_etag" -o "$TMP_BODY" -w "%{http_code}" "$response_url")" || {
+      echo "FAIL $response_name: request failed"
+      exit 1
+    }
+  else
+    response_status="$(curl -sS -D "$TMP_HEADERS" -H "If-None-Match: $response_etag" -o "$TMP_BODY" -w "%{http_code}" "$response_url")" || {
+      echo "FAIL $response_name: request failed"
+      exit 1
+    }
+  fi
+
+  if [ "$response_status" != "304" ]; then
+    echo "FAIL $response_name: expected HTTP 304, got HTTP $response_status"
+    head -c 500 "$TMP_BODY"
+    echo
+    exit 1
+  fi
+
+  expect_header "$response_name API version" "X-API-Version" "v1"
+  expect_header "$response_name cache status" "X-Cache-Status" "hit"
+  conditional_etag="$(header_value "ETag")"
+  if [ "$conditional_etag" != "$response_etag" ]; then
+    echo "FAIL $response_name: expected ETag $response_etag, got ${conditional_etag:-<missing>}"
+    cat "$TMP_HEADERS"
+    exit 1
+  fi
+  if [ -s "$TMP_BODY" ]; then
+    echo "FAIL $response_name: 304 response must not contain a body"
+    cat "$TMP_BODY"
+    exit 1
+  fi
+
+  echo "OK   $response_name (304, cache=hit, empty body)"
 }
 
 ENCODED_QUERY="$(url_encode "$QUERY")"
@@ -143,4 +198,6 @@ expect_status "openapi" "200" "$BASE_URL/openapi.yaml"
 expect_api_status "articles" "200" "$BASE_URL/api/articles?query=$ENCODED_QUERY&count=$COUNT"
 expect_api_response "v1 articles (cache miss)" "200" "$V1_URL" "v1" "miss"
 expect_api_response "v1 articles (cache hit)" "200" "$V1_URL" "v1" "hit"
+V1_ETAG="$(header_value "ETag")"
+expect_api_not_modified "v1 articles (conditional 304)" "$V1_URL" "$V1_ETAG"
 expect_status "metrics" "200" "$BASE_URL/metrics"

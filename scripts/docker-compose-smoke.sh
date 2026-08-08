@@ -8,6 +8,7 @@ RATE_LIMIT_A_URL="${RATE_LIMIT_A_URL:-http://127.0.0.1:3001}"
 RATE_LIMIT_B_URL="${RATE_LIMIT_B_URL:-http://127.0.0.1:3002}"
 RATE_LIMIT_CLIENT_IP="${RATE_LIMIT_CLIENT_IP:-198.51.100.42}"
 FAKE_GNEWS_URL="${FAKE_GNEWS_URL:-http://127.0.0.1:4010}"
+SMOKE_CLIENT_API_KEY="${SMOKE_CLIENT_API_KEY:-ci-client}"
 RATE_LIMIT_BODY="$(mktemp)"
 READINESS_BODY="$(mktemp)"
 CACHE_COORDINATION_BODY_A="$(mktemp)"
@@ -146,7 +147,7 @@ if [ "$CACHE_COORDINATION_AFTER" -ne "$CACHE_COORDINATION_EXPECTED" ]; then
 fi
 echo "OK   cross-replica cache coordination (one upstream call)"
 
-BASE_URL="$BASE_URL" QUERY="${QUERY:-ci-smoke}" COUNT="${COUNT:-3}" PAGE="${PAGE:-2}" npm run smoke
+CLIENT_API_KEY="$SMOKE_CLIENT_API_KEY" BASE_URL="$BASE_URL" QUERY="${QUERY:-ci-smoke}" COUNT="${COUNT:-3}" PAGE="${PAGE:-2}" npm run smoke
 
 docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" stop redis
 wait_for_rate_limit_store_failure "rate-limit-a" "$RATE_LIMIT_A_URL"
