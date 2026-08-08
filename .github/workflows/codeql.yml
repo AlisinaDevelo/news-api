@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "24 11 * * 1"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
 permissions:
   contents: read
   security-events: write
@@ -15,6 +19,7 @@ permissions:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
     steps:
