@@ -37,4 +37,5 @@ CI runs `npm audit` on every push. Run `npm audit` locally before releases.
 
 - Workflow artifacts include an **SPDX** JSON SBOM from [Anchore SBOM Action](https://github.com/anchore/sbom-action).
 - The **Provenance** workflow creates a GitHub **build attestation** for `package-lock.json`; the `main` workflow fails if the attestation cannot be produced.
+- Every external GitHub Action is pinned to a verified full commit SHA, with the intended release tag retained in a comment. `npm run workflow:check` rejects mutable action references locally and in CI.
 - **Codecov** uploads require optional secret `CODECOV_TOKEN` on private repositories.

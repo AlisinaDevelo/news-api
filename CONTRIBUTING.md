@@ -12,6 +12,7 @@ Add a valid `GNEWS_API_KEY` in `.env` when exercising the real API locally. Auto
 ## Before you open a PR
 
 ```bash
+npm run workflow:check
 npm audit --audit-level=high
 npm run lint
 npm test
@@ -20,7 +21,7 @@ npm run build
 docker build .
 ```
 
-This matches what [CI](docs/CI.md) runs on Node 20 and 22 (plus Docker, SBOM, and related workflows). Coverage enforces the global 80/80/80/75 floor for statements, lines, functions, and branches. For private repos, add **`CODECOV_TOKEN`** in GitHub if you want Codecov uploads.
+This matches what [CI](docs/CI.md) runs on Node 20 and 22 (plus Docker, SBOM, and related workflows). Workflow actions must remain pinned to verified full SHAs; coverage enforces the global 80/80/80/75 floor for statements, lines, functions, and branches. For private repos, add **`CODECOV_TOKEN`** in GitHub if you want Codecov uploads.
 
 To exercise **OpenTelemetry** locally, run a collector (for example Jaeger OTLP on port 4318) and set `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_TRACING_ENABLED=1` before `npm start`.
 

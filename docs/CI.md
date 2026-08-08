@@ -45,10 +45,20 @@ When you push an annotated tag matching `v*.*.*`, [release.yml](../.github/workf
 
 [Dependabot](../.github/dependabot.yml) opens weekly PRs for npm, Docker base images, and GitHub Actions.
 
+### Workflow action supply chain
+
+Every external action in `.github/workflows/` is pinned to a full 40-character commit SHA. Each
+pin keeps a nearby release comment such as `# v5` so reviewers and Dependabot can identify the
+intended upstream version. `npm run workflow:check` parses every workflow locally without network
+access and rejects tags, branches, abbreviated SHAs, or other mutable references; the Node 20 CI
+job runs the same guard. When updating an action, resolve the new release tag in the upstream
+repository, verify the full SHA, update the release comment, and run the guard before pushing.
+
 ## Local parity
 
 ```bash
 npm ci
+npm run workflow:check
 npm audit --audit-level=high
 npm run lint
 npm run contract
@@ -86,6 +96,7 @@ Download the **`coverage-lcov`** artifact from a workflow run to inspect HTML/LC
 |--------|----------------|
 | `npm ci` fails after lockfile change | Run `npm install` locally and commit the updated `package-lock.json`. |
 | `npm audit` fails in CI | Run `npm audit` locally; upgrade or patch dependencies, then commit the lockfile. |
+| Workflow action pin check fails | Replace the tag or abbreviated SHA with a verified full upstream commit SHA and keep the release comment current. |
 | Tests pass locally but fail in CI | Align Node version with the matrix; avoid relying on local-only env vars. |
 | Docker job fails | Ensure the Dockerfile paths and `npm run build` still succeed after changes. |
 | Codecov shows no data | Add `CODECOV_TOKEN` for private repos or confirm the repository is linked on codecov.io. |
