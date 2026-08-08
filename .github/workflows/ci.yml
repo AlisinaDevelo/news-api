@@ -32,6 +32,10 @@ jobs:
         if: matrix.node-version == '20'
         run: npm run workflow:check
 
+      - name: Container image pins
+        if: matrix.node-version == '20'
+        run: npm run container:check
+
       - name: Audit dependencies
         run: npm audit --audit-level=high
 
