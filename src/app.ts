@@ -19,13 +19,17 @@ import { resolveServerMaxJsonBodyBytes } from "./config/httpBody";
 const openApiFile = path.resolve(process.cwd(), "docs", "openapi.yaml");
 
 const app = express();
+const jsonBodyParser = express.json({
+  limit: resolveServerMaxJsonBodyBytes(),
+  strict: true,
+  inflate: false,
+});
 
 applyTrustProxy(app);
 app.use(httpLogger);
 app.use(metricsRequestObserver);
 app.use(securityHeaders);
 app.use(compression({ threshold: DEFAULT_COMPRESSION_THRESHOLD_BYTES }));
-app.use(express.json({ limit: resolveServerMaxJsonBodyBytes(), strict: true }));
 app.use(apiRateLimiter);
 
 app.get("/health", (_req, res) => {
@@ -102,7 +106,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-app.use("/api", clientApiKeyGate, routes);
+app.use("/api", clientApiKeyGate, jsonBodyParser, routes);
 
 app.use(errorHandler);
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { gzipSync } from "node:zlib";
 import request from "supertest";
 
 const { mockGet } = vi.hoisted(() => ({
@@ -111,6 +112,29 @@ describe("app", () => {
     const metrics = await request(app).get("/metrics");
     expect(metrics.text).toContain('news_http_body_errors_total{type="entity.too.large"} 1');
     expect(metrics.text).toContain('news_http_body_errors_total{type="entity.parse.failed"} 1');
+  });
+
+  it("rejects compressed JSON bodies before inflation", async () => {
+    const compressed = gzipSync(Buffer.from(JSON.stringify({ payload: "safe" })));
+    const response = await request(app)
+      .post("/api/v1/articles")
+      .set("Content-Type", "application/json")
+      .set("Content-Encoding", "gzip")
+      .send(compressed);
+
+    expect(response.status).toBe(415);
+    expect(response.body).toEqual({
+      error: {
+        code: "unsupported_content_encoding",
+        message: "Unsupported request content encoding",
+        requestId: response.headers["x-request-id"],
+      },
+    });
+
+    const metrics = await request(app).get("/metrics");
+    expect(metrics.text).toContain(
+      'news_http_body_errors_total{type="encoding.unsupported"} 1'
+    );
   });
 
   it("GET /ready returns ready in test", async () => {
@@ -864,10 +888,12 @@ describe("CLIENT_API_KEYS gate", () => {
     mockGet.mockReset();
     resetCacheStoreForTests();
     resetGNewsCircuitForTests();
+    httpBodyErrorsTotal.reset();
     vi.stubEnv("CLIENT_API_KEYS", "secret-one");
   });
 
   afterEach(() => {
+    httpBodyErrorsTotal.reset();
     vi.unstubAllEnvs();
   });
 
@@ -883,5 +909,23 @@ describe("CLIENT_API_KEYS gate", () => {
       .get("/api/articles?query=x&count=1")
       .set("X-API-Key", "secret-one");
     expect(res.status).toBe(200);
+  });
+
+  it("checks the API key before parsing a request body", async () => {
+    const res = await request(app)
+      .post("/api/v1/articles")
+      .set("Content-Type", "application/json")
+      .send('{"payload":');
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({
+      error: {
+        code: "invalid_api_key",
+        message: "Invalid or missing API key",
+      },
+    });
+
+    const metrics = await request(app).get("/metrics");
+    expect(metrics.text).not.toContain('news_http_body_errors_total{type="entity.parse.failed"}');
   });
 });
