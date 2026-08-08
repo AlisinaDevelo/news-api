@@ -61,6 +61,11 @@ later `GET` or `HEAD` request. When the selected representation is unchanged, th
 `304 Not Modified` with the current `ETag` and no body. The client exposes parallel conditional
 methods that preserve the existing unconditional API:
 
+Successful v1 reads also return `Cache-Control: private, no-cache`. A private client cache may
+retain the representation, but it must validate it before reuse; the API-keyed response is not
+intended for shared-cache replay. The internal Redis/article cache is a separate server-side
+optimization and is not controlled by this HTTP header.
+
 ```ts
 const params = { query: "postgres", count: 5 };
 const first = await client.searchArticlesConditional(params);

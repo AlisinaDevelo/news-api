@@ -83,6 +83,13 @@ before JSON request bodies are parsed.
 
 - **`GET /openapi.yaml`** — served from `docs/openapi.yaml` relative to the process working directory. The production image sets `WORKDIR /app` and includes that file under `docs/openapi.yaml`.
 
+Successful `/api/v1/*` representation responses, including bodyless `304` responses, emit
+`Cache-Control: private, no-cache` together with the weak `ETag`. This allows a caller's private
+cache to retain a representation while requiring validation before reuse. It deliberately keeps
+responses out of shared caches because `CLIENT_API_KEYS` is carried in a custom `X-API-Key`
+header; do not replace this with a shared-cache policy that keys on bearer secrets. The policy is
+an HTTP client concern and does not change the internal Redis or in-memory article-cache TTL.
+
 ## Scaling and cache
 
 - **No `REDIS_URL`:** in-process cache (`node-cache`, 600s TTL, bounded to `CACHE_MAX_KEYS` entries with least-recently-used eviction). Each replica has its own entries. Fresh and stale keys share this capacity; expired entries are removed on access and new writes evict the oldest live entry when needed.

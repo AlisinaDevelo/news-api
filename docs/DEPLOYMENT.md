@@ -1,6 +1,6 @@
 # Deployment
 
-This service is safe to deploy as a small read-only portfolio demo, but it still spends GNews quota. For public links, prefer a low rate limit plus `CLIENT_API_KEYS` for `/api/*`; leave `/health`, `/ready`, `/openapi.yaml`, and `/metrics` available for inspection.
+This service is safe to deploy as a small read-only portfolio demo, but it still spends GNews quota. For public links, prefer a low rate limit plus `CLIENT_API_KEYS` for `/api/*`; leave `/health`, `/ready`, `/openapi.yaml`, and `/metrics` available for inspection. Successful v1 reads use `Cache-Control: private, no-cache` with ETags, so caller caches can revalidate without allowing a shared intermediary to replay an API-keyed response.
 
 The production Dockerfile uses reviewed tag-plus-manifest-digest base images. Dependabot's weekly
 Docker updates should be treated as normal dependency changes and verified with
