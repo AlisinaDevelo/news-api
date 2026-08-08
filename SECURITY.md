@@ -23,7 +23,8 @@ We aim to acknowledge reports within a few business days.
 - Run behind a reverse proxy with TLS termination in production.
 - Set `TRUST_PROXY=1` only when the proxy strips or sanitizes `X-Forwarded-For`.
 - Keep `GNEWS_API_KEY` in a secret store; never commit `.env`.
-- If you use `CLIENT_API_KEYS`, rotate them like any API credential; prefer a secret manager over plain Deployment env in production.
+- If you use `CLIENT_API_KEYS`, generate random, equal-length ASCII values and keep them in a secret manager rather than plain Deployment env. During verification, the service hashes the supplied key and every configured key to fixed-length SHA-256 digests, then compares every rotation slot with `crypto.timingSafeEqual`; the environment values remain bearer secrets, not stored password hashes.
+- Rotate client keys with an overlap: deploy `old-key,new-key`, move clients to the new key, then deploy only `new-key`. Values are comma-delimited and surrounding whitespace is trimmed, so generated keys must not contain commas or intentional leading/trailing spaces.
 - Access logs use an allowlist and do not persist API keys, cookies, query strings, request bodies, or remote addresses. Invalid `X-Request-Id` values are replaced with generated IDs.
 - JSON request bodies are strictly parsed under the `SERVER_MAX_JSON_BODY_BYTES` limit (32768 bytes by default, 262144 maximum) only after the `/api` rate-limit and API-key gates. Compressed request bodies are rejected before inflation. Body-parser failures use fixed public messages and are logged only as bounded parser types/statuses; raw failed bodies and parser messages are not persisted.
 - Tune `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, and `HTTP_TIMEOUT_MS` for your traffic profile.

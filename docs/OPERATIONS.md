@@ -39,7 +39,7 @@
 | `DISABLE_RATE_LIMIT` | `0` | Set to `1` to disable limiting (emergency only). |
 | `TRUST_PROXY` | `0` | Set to `1` behind a reverse proxy so rate limits use `X-Forwarded-For`. |
 | `REDIS_URL` | — | If set (e.g. `redis://localhost:6379`), article search results and rate-limit quotas use Redis. Omit to use per-process memory stores. |
-| `CLIENT_API_KEYS` | — | Comma-separated secrets. When set, every `/api/*` request must send header `X-API-Key` matching one value. Omit to allow unauthenticated API access (still use network controls in production). |
+| `CLIENT_API_KEYS` | — | Comma-separated bearer secrets. When set, every `/api/*` request must send header `X-API-Key` matching one byte-exact value. Multiple values support overlap rotation. Omit to allow unauthenticated API access (still use network controls in production). |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Base OTLP URL (e.g. `http://jaeger:4318`). Traces POST to `/v1/traces`. Enables tracing when set. |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | — | Full traces URL; overrides the base + `/v1/traces` combination. |
 | `OTEL_SERVICE_NAME` | `news-api` | `service.name` resource attribute. |
@@ -52,6 +52,24 @@ is not compressed twice.
 Runtime numeric settings are parsed as safe integers. Fractional, non-finite, negative, or
 malformed values use their documented defaults; optional retry counts may be `0`, and settings
 with documented maximums are clamped.
+
+## Client API key rotation
+
+Use random, equal-length ASCII keys without commas or leading/trailing spaces; for example,
+`openssl rand -hex 32`. The service trims comma-separated configuration values, hashes each
+supplied and configured value to a fixed-length SHA-256 digest, and checks every configured
+rotation slot with `crypto.timingSafeEqual`. This comparison step does not turn the environment
+values into stored password hashes: `CLIENT_API_KEYS` and client headers remain bearer secrets.
+
+Rotate without an authentication outage:
+
+1. Deploy `CLIENT_API_KEYS=old-key,new-key`.
+2. Move every client to `new-key`.
+3. Deploy `CLIENT_API_KEYS=new-key` to revoke the old key.
+
+Reload or redeploy every replica after each secret-manager change so the active fleet shares the
+same rotation set. Missing and invalid keys use the same fixed `401` response and are rejected
+before JSON request bodies are parsed.
 
 ## Probes
 
