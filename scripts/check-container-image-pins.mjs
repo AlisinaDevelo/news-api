@@ -46,6 +46,16 @@ function inspectDockerfile(file, violations, references) {
 
   lines.forEach((line, index) => {
     const trimmed = line.trim();
+    const syntaxMatch = trimmed.match(/^#\s*syntax\s*=\s*(\S+)$/i);
+    if (syntaxMatch) {
+      const reference = syntaxMatch[1];
+      references.push(`${file}:${index + 1} syntax`);
+      if (!isPinned(reference)) {
+        violations.push(`${file}:${index + 1} syntax: ${reference}`);
+      }
+      return;
+    }
+
     if (!trimmed || trimmed.startsWith("#")) {
       return;
     }
@@ -88,11 +98,15 @@ for (const file of composeFiles) {
 }
 
 if (violations.length > 0) {
-  console.error("Container images must retain a tag and use a full 64-character sha256 digest:");
+  console.error(
+    "Container image and syntax references must retain a tag and use a full 64-character sha256 digest:"
+  );
   for (const violation of violations) {
     console.error(`- ${violation}`);
   }
   process.exitCode = 1;
 } else {
-  console.log(`Checked ${references.length} external container image references; all use tag-plus-digest references.`);
+  console.log(
+    `Checked ${references.length} external container build references; all use tag-plus-digest references.`
+  );
 }
