@@ -1,6 +1,29 @@
 # news-api
 
-**Express + TypeScript** service that searches news through the [GNews API](https://gnews.io/). Searches support provider-backed filters for language, country, date range, sort order, and bounded pagination. Identical normalized searches are cached (a bounded in-memory cache by default, or **Redis** when `REDIS_URL` is set) to protect quota and latency. The upstream base URL is injectable for deterministic local integration tests and benchmarks.
+[![CI](https://github.com/AlisinaDevelo/news-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AlisinaDevelo/news-api/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/AlisinaDevelo/news-api/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/AlisinaDevelo/news-api/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-0b7285.svg)](LICENSE)
+[![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-339933.svg?logo=nodedotjs&logoColor=white)](package.json)
+
+**Production-minded Express + TypeScript service** that searches news through the [GNews API](https://gnews.io/). It combines a small, inspectable API surface with resilient caching, explicit operational boundaries, and a reproducible delivery pipeline.
+
+## Portfolio snapshot
+
+| Signal | Evidence |
+|---|---|
+| Backend engineering | Node.js 20/22, TypeScript, Express, validated provider adapter, OpenAPI-generated client |
+| Reliability | Memory/Redis caching, stale fallback, request coalescing, cross-replica leases, retries, circuit breaker |
+| Operations | Prometheus metrics, OpenTelemetry spans, liveness/readiness, request cancellation, graceful drain |
+| Delivery and security | Docker/Compose, Kubernetes examples, pinned Actions/images, SBOM, provenance, dependency audit |
+
+## Start here
+
+- [Architecture and request flow](docs/ARCHITECTURE.md)
+- [Operations and runtime settings](docs/OPERATIONS.md)
+- [OpenAPI contract](docs/openapi.yaml)
+- [TypeScript client](docs/CLIENT.md)
+- [CI and supply-chain gates](docs/CI.md)
+- [Reproducible benchmark](docs/BENCHMARKS.md)
 
 ## How a request flows
 

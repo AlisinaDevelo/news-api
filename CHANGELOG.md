@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [1.3.0] — 2026-08-09
+
 ### Added
 
 - Optional search filters for `lang`, `country`, `from`, `to`, and `sortBy`, with validation and normalized cache keys.
@@ -42,16 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upstream Axios responses are capped at `5 MiB` before payload validation and caching.
 - Transient upstream network and 5xx failures receive one bounded retry by default; malformed payloads and non-transient client errors are not retried.
 - Permanent upstream 4xx responses no longer trip the temporary circuit-open state.
+- Shared Redis rate-limit quotas, renewable cross-replica cache-miss leases, and a deterministic degraded-mode fault matrix.
+- Downstream cancellation, bounded total upstream deadlines, transport limits, graceful drain behavior, and pre-Express transport telemetry.
+- Explicit JSON body limits, read-only route semantics, timing-safe client API-key verification, and private HTTP cache revalidation with ETags.
+- Hosted CI guards for immutable GitHub Actions, container image and Dockerfile syntax dependencies, workflow runtime bounds, coverage, SBOM, and provenance.
 
 ### Changed
 
 - Split GNews-specific provider mapping and payload validation into a provider adapter, leaving the news service focused on cache/search orchestration.
 - Provider responses now validate each article and source shape before caching or returning data.
 - Malformed Redis cache JSON now surfaces through the tolerated cache error path and metrics instead of being silently treated as a miss.
+- The TypeScript client now exposes typed conditional v1 reads, while OpenAPI and generated types are checked for drift in CI.
 
 ### Security
 
 - Refreshed OpenTelemetry packages and the dependency lockfile; `npm audit --audit-level=high` reports zero vulnerabilities.
+- Access logs are privacy-safe, bearer-key comparisons are timing-safe, and external workflow/container dependencies are pinned immutably.
 
 ## [1.2.0] — 2026-04-05
 
