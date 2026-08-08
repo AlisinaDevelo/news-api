@@ -59,12 +59,13 @@ repository, verify the full SHA, update the release comment, and run the guard b
 
 ### Container image supply chain
 
-Every external `FROM` and Compose `image:` reference keeps its human-readable tag and a full
-manifest digest, for example `node:22-alpine@sha256:...`. Tags are useful maintenance context;
-the digest is the reproducible input used by Docker. `npm run container:check` checks the tracked
-Dockerfile and Compose files without network access and runs in the Node 20 CI job. When Dependabot
-opens a Docker update, review the tag and digest together, run the full Docker build and Compose
-smoke, and treat the digest change as a normal dependency change.
+Every external Dockerfile `# syntax=`, `FROM`, and Compose `image:` reference keeps its
+human-readable tag and a full manifest digest, for example `node:22-alpine@sha256:...`. Tags are
+useful maintenance context; the digest is the reproducible input used by Docker.
+`npm run container:check` checks the tracked Dockerfile and Compose files without network access
+and runs in the Node 20 CI job. When Dependabot opens a Docker update, review the tag and digest
+together, run the full Docker build and Compose smoke, and treat the digest change as a normal
+dependency change.
 
 This follows Docker's [Dockerfile `FROM` reference](https://docs.docker.com/reference/dockerfile/),
 [digest guidance](https://docs.docker.com/reference/cli/docker/image/pull/), and

@@ -196,9 +196,10 @@ Use cache hit rate, coalesced miss counts, and coordination events to understand
 
 ## Docker
 
-The Dockerfile and both Compose files pin external images with a human-readable tag plus a full
-manifest digest. This keeps local and hosted builds on the same reviewed image index while leaving
-Dependabot a visible tag to update. Check the policy without a registry call:
+The Dockerfile frontend syntax, Dockerfile stages, and both Compose files pin external images with
+a human-readable tag plus a full manifest digest. This keeps local and hosted builds on the same
+reviewed image index while leaving Dependabot a visible tag to update. Check the policy without a
+registry call:
 
 ```bash
 npm run container:check

@@ -23,7 +23,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 - **Kubernetes-style probes:** `GET /health` (process liveness), `GET /ready` (provider configuration, graceful drain state, and bounded rate-limit Redis availability when that fail-closed store is enabled).
 - **Supply chain:** `npm audit` in CI; **SPDX SBOM** artifacts; Docker builds with **SBOM + provenance**; **dependency review** on PRs; fail-closed **SLSA-style lockfile attestation** on `main`; full-SHA-pinned GitHub Actions and tag-plus-digest-pinned Docker images with CI guards; lockfile-only installs.
 - **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
-- **Container:** multi-stage [Dockerfile](Dockerfile) with reviewed tag-plus-digest base images, a non-root user, and a healthcheck.
+- **Container:** multi-stage [Dockerfile](Dockerfile) with reviewed tag-plus-digest frontend/base images, a non-root user, and a healthcheck.
 - **Deploy:** Example [Kubernetes manifests](deploy/k8s/).
 
 **Automation:** [CI](.github/workflows/ci.yml) (Node **20**/**22**), [CodeQL](.github/workflows/codeql.yml), [Codecov](https://codecov.io) upload, [dependency review](.github/workflows/dependency-review.yml), [SBOM](.github/workflows/supply-chain.yml), [provenance attest](.github/workflows/provenance.yml), [releases on tags](.github/workflows/release.yml), and [Dependabot](.github/dependabot.yml) (npm, Docker, Actions). Details: [docs/CI.md](docs/CI.md). Operations: [docs/OPERATIONS.md](docs/OPERATIONS.md). TypeScript client: [docs/CLIENT.md](docs/CLIENT.md). Security: [SECURITY.md](SECURITY.md).
