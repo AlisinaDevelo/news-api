@@ -120,6 +120,7 @@ expect_api_response() {
   fi
 
   expect_header "$response_name API version" "X-API-Version" "$response_expected_api_version"
+  expect_header "$response_name cache policy" "Cache-Control" "private, no-cache"
   if [ -n "$response_expected_cache_status" ]; then
     expect_header "$response_name cache status" "X-Cache-Status" "$response_expected_cache_status"
   fi
@@ -170,6 +171,7 @@ expect_api_not_modified() {
   fi
 
   expect_header "$response_name API version" "X-API-Version" "v1"
+  expect_header "$response_name cache policy" "Cache-Control" "private, no-cache"
   expect_header "$response_name cache status" "X-Cache-Status" "hit"
   conditional_etag="$(header_value "ETag")"
   if [ "$conditional_etag" != "$response_etag" ]; then
