@@ -150,6 +150,7 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses
 | `npm run client:generate` | Generate TypeScript client types from `docs/openapi.yaml`. |
 | `npm run client:check` | Regenerate client types and fail if checked-in output is stale. |
 | `npm run workflow:check` | Verify every external GitHub Action uses a full commit SHA. |
+| `npm run workflow:bounds` | Verify workflow job timeouts and stale-run concurrency policies. |
 | `npm run container:check` | Verify every Dockerfile and Compose image keeps a tag plus a full SHA-256 digest. |
 | `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, `PAGE`, optional `CLIENT_API_KEY`). |
 | `npm run smoke:docker` | Compose smoke test: boot Redis, the image, a fake GNews provider, and two rate-limit replicas; prove HTTP behavior, shared quotas, cross-replica cache coordination, and Redis readiness loss/recovery. |
