@@ -58,9 +58,25 @@ validated `Retry-After` delta-seconds value when the API received one.
 
 Every successful `/api/v1/*` read returns a weak `ETag`. Send that value as `If-None-Match` on a
 later `GET` or `HEAD` request. When the selected representation is unchanged, the API returns
-`304 Not Modified` with the current `ETag` and no body. The small convenience methods above always
-return a fresh `200` envelope; use the OpenAPI contract or a direct `fetch` call when the caller
-needs to manage a conditional request and retain its cached envelope.
+`304 Not Modified` with the current `ETag` and no body. The client exposes parallel conditional
+methods that preserve the existing unconditional API:
+
+```ts
+const params = { query: "postgres", count: 5 };
+const first = await client.searchArticlesConditional(params);
+
+if (first.status === 200) {
+  cache.store(first.body, first.etag);
+}
+
+const cached = cache.load();
+const next = await client.searchArticlesConditional(params, cached?.etag);
+const envelope = next.status === 304 ? cached?.body : next.body;
+```
+
+`getArticleByTitleConditional` and `listSourceArticlesConditional` follow the same result shape.
+On `200`, the result is `{ status: 200, etag, body }`; on `304`, it is `{ status: 304, etag }`,
+so callers can retain their cached envelope without attempting to parse an empty response.
 
 The wrapper intentionally targets `/api/v1/*` only. Legacy `/api/articles*` routes remain
 available for backward compatibility, but new consumers should use v1 envelopes.
