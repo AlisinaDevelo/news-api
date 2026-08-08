@@ -1,6 +1,6 @@
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
@@ -8,7 +8,7 @@ services:
       retries: 15
 
   fake-gnews:
-    image: node:22-alpine
+    image: node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
     ports:
       - "4010:4010"
     working_dir: /app
