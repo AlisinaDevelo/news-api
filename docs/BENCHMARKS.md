@@ -30,8 +30,8 @@ Run this on your machine before publishing numbers in a profile or portfolio; be
 
 Command: `npm run benchmark:local`
 
-- Date: `2026-08-08T23:06:35.758Z`
-- Commit: `30896a9`
+- Date: `2026-08-08T23:08:44.445Z`
+- Commit: `46001c8`
 - Node: `v26.0.0`
 - Host: `Darwin 25.5.0 (Apple M1)`
 - Fake provider delay: `15ms`
@@ -39,8 +39,8 @@ Command: `npm run benchmark:local`
 
 | Scenario | Requests | Concurrency | Upstream calls | Success | Failed | p50 ms | p95 ms | p99 ms | Throughput req/s |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Cold unique searches | 300 | 20 | 300 | 300 | 0 | 27.2 | 52.6 | 55.7 | 678 |
-| Warm cached search | 500 | 50 | 0 | 500 | 0 | 14.2 | 26.6 | 77.9 | 2884 |
+| Cold unique searches | 300 | 20 | 300 | 300 | 0 | 27.2 | 51.0 | 57.3 | 689 |
+| Warm cached search | 500 | 50 | 0 | 500 | 0 | 14.5 | 25.4 | 72.9 | 3004 |
 
 ## Metric Notes
 
