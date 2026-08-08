@@ -348,6 +348,7 @@ describe("app", () => {
     expect(res.status).toBe(200);
     expect(res.headers["x-api-version"]).toBe("v1");
     expect(res.headers["x-cache-status"]).toBe("miss");
+    expect(res.headers["cache-control"]).toBe("private, no-cache");
     expect(res.headers.etag).toMatch(/^W\/"sha256-[A-Za-z0-9_-]+"$/);
     expect(res.body).toMatchObject({
       data: sampleArticles,
@@ -372,6 +373,7 @@ describe("app", () => {
     expect(res.status).toBe(200);
     expect(res.headers["x-api-version"]).toBe("v1");
     expect(res.headers["x-cache-status"]).toBe("hit");
+    expect(res.headers["cache-control"]).toBe("private, no-cache");
     expect(res.body.meta.cache).toBe("hit");
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
@@ -387,8 +389,10 @@ describe("app", () => {
       .set("If-None-Match", first.headers.etag);
 
     expect(first.status).toBe(200);
+    expect(first.headers["cache-control"]).toBe("private, no-cache");
     expect(second.status).toBe(304);
     expect(second.headers.etag).toBe(first.headers.etag);
+    expect(second.headers["cache-control"]).toBe("private, no-cache");
     expect(second.headers["x-api-version"]).toBe("v1");
     expect(second.headers["x-cache-status"]).toBe("hit");
     expect(second.text ?? "").toBe("");
@@ -403,6 +407,7 @@ describe("app", () => {
       .set("If-None-Match", '"different"');
 
     expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toBe("private, no-cache");
     expect(res.headers.etag).toMatch(/^W\/"sha256-[A-Za-z0-9_-]+"$/);
     expect(res.body.data).toEqual(sampleArticles);
   });

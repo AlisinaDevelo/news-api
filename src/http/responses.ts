@@ -4,6 +4,8 @@ import { normalizeRequestId } from "./requestId";
 
 type RequestWithId = Request & { id?: unknown };
 
+const V1_CACHE_CONTROL = "private, no-cache";
+
 export function requestId(req: Request): string {
   const id = (req as RequestWithId).id;
   return normalizeRequestId(id) ?? normalizeRequestId(req.headers["x-request-id"]) ?? "unknown";
@@ -16,6 +18,7 @@ export function sendEnvelope<TData, TMeta extends Record<string, unknown>>(
   meta: TMeta
 ): void {
   res.setHeader("X-API-Version", "v1");
+  res.setHeader("Cache-Control", V1_CACHE_CONTROL);
   if (typeof meta.cache === "string" && meta.cache.trim()) {
     res.setHeader("X-Cache-Status", meta.cache);
   }
