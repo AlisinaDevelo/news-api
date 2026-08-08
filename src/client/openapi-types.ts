@@ -48,7 +48,7 @@ export interface paths {
         };
         /**
          * Readiness probe
-         * @description Returns 503 when the API key is missing or the process is draining during shutdown.
+         * @description Returns 503 when the API key is missing, required rate-limit Redis is unavailable, or the process is draining during shutdown.
          */
         get: operations["getReady"];
         put?: never;
@@ -265,7 +265,7 @@ export interface components {
              * @example missing_api_key
              * @enum {string}
              */
-            reason: "missing_api_key";
+            reason: "missing_api_key" | "rate_limit_store_unavailable";
         };
         DrainingResponse: {
             /**
@@ -556,7 +556,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReadyResponse"];
                 };
             };
-            /** @description Not ready because the API key is missing or shutdown is draining traffic */
+            /** @description Not ready because the API key or required rate-limit store is unavailable, or shutdown is draining traffic */
             503: {
                 headers: {
                     [name: string]: unknown;

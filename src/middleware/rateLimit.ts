@@ -11,7 +11,10 @@ import { resolveRateLimitRedisOptions } from "../config/redis";
 import { HttpError } from "../errors/HttpError";
 import { logger } from "../logger";
 import { rateLimitStoreErrorsTotal } from "../metrics/register";
-import { createRedisCommandRunner } from "../redis/commandRunner";
+import {
+  createRedisCommandRunner,
+  type RedisCommandRunner,
+} from "../redis/commandRunner";
 
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_LIMIT = 120;
@@ -19,6 +22,46 @@ const IPV6_SUBNET = 56;
 const REDIS_KEY_PREFIX = "news-api:rate-limit:";
 
 let redisClient: Redis | null = null;
+let redisCommandRunner: RedisCommandRunner | null = null;
+
+interface RateLimitReadinessClient {
+  ping(): Promise<string>;
+}
+
+interface RateLimitStoreReadinessOptions {
+  required: boolean;
+  client: RateLimitReadinessClient | null;
+  runCommand: RedisCommandRunner | null;
+}
+
+export async function checkRateLimitStoreReadiness({
+  required,
+  client,
+  runCommand,
+}: RateLimitStoreReadinessOptions): Promise<boolean> {
+  if (!required) {
+    return true;
+  }
+  if (!client || !runCommand) {
+    return false;
+  }
+
+  try {
+    return (await runCommand(() => client.ping())) === "PONG";
+  } catch {
+    return false;
+  }
+}
+
+export function isRateLimitStoreReady(): Promise<boolean> {
+  const required =
+    process.env.DISABLE_RATE_LIMIT !== "1" && Boolean(process.env.REDIS_URL?.trim());
+  return checkRateLimitStoreReadiness({
+    required,
+    client: redisClient,
+    runCommand: redisCommandRunner,
+  });
+}
 
 function skipRateLimit(req: Request): boolean {
   if (
@@ -54,6 +97,7 @@ function createRedisStore(url: string): Store {
   const client = new Redis(url, options);
   redisClient = client;
   const runCommand = createRedisCommandRunner(client, options.connectTimeout ?? 1_000);
+  redisCommandRunner = runCommand;
   client.on("error", (err) => {
     rateLimitStoreErrorsTotal.inc({ source: "connection" });
     logger.error({ err }, "rate-limit redis connection error");
@@ -136,5 +180,6 @@ export async function disconnectRateLimitStore(): Promise<void> {
     await redisClient.quit();
   } finally {
     redisClient = null;
+    redisCommandRunner = null;
   }
 }

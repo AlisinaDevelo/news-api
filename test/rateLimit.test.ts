@@ -2,9 +2,13 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import type { Store } from "express-rate-limit";
-import { createApiRateLimiter } from "../src/middleware/rateLimit";
+import {
+  checkRateLimitStoreReadiness,
+  createApiRateLimiter,
+} from "../src/middleware/rateLimit";
 import { errorHandler } from "../src/middleware/errorHandler";
 import { register } from "../src/metrics/register";
+import type { RedisCommandRunner } from "../src/redis/commandRunner";
 
 interface SharedEntry {
   totalHits: number;
@@ -109,5 +113,66 @@ describe("shared rate limiting", () => {
       },
     });
     expect(metrics).toContain('news_rate_limit_store_errors_total{source="request"}');
+  });
+});
+
+describe("rate-limit Redis readiness", () => {
+  it("does not probe Redis when the rate-limit store is optional", async () => {
+    await expect(
+      checkRateLimitStoreReadiness({
+        required: false,
+        client: null,
+        runCommand: null,
+      })
+    ).resolves.toBe(true);
+  });
+
+  it("reports a required store without an initialized client as unavailable", async () => {
+    await expect(
+      checkRateLimitStoreReadiness({
+        required: true,
+        client: null,
+        runCommand: null,
+      })
+    ).resolves.toBe(false);
+  });
+
+  it("probes a required store through the bounded command runner", async () => {
+    let commands = 0;
+    const runCommand: RedisCommandRunner = async <T>(command: () => Promise<T>) => {
+      commands += 1;
+      return command();
+    };
+
+    await expect(
+      checkRateLimitStoreReadiness({
+        required: true,
+        client: { ping: async () => "PONG" },
+        runCommand,
+      })
+    ).resolves.toBe(true);
+    expect(commands).toBe(1);
+  });
+
+  it("reports failed and unexpected Redis probes as unavailable", async () => {
+    const runCommand: RedisCommandRunner = async <T>(command: () => Promise<T>) => command();
+    const failedRunner: RedisCommandRunner = async () => {
+      throw new Error("redis unavailable");
+    };
+
+    await expect(
+      checkRateLimitStoreReadiness({
+        required: true,
+        client: { ping: async () => "OK" },
+        runCommand,
+      })
+    ).resolves.toBe(false);
+    await expect(
+      checkRateLimitStoreReadiness({
+        required: true,
+        client: { ping: async () => "PONG" },
+        runCommand: failedRunner,
+      })
+    ).resolves.toBe(false);
   });
 });

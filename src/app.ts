@@ -6,12 +6,13 @@ import routes from "./routes";
 import { HttpError } from "./errors/HttpError";
 import { errorHandler } from "./middleware/errorHandler";
 import { securityHeaders } from "./middleware/security";
-import { apiRateLimiter } from "./middleware/rateLimit";
+import { apiRateLimiter, isRateLimitStoreReady } from "./middleware/rateLimit";
 import { applyTrustProxy } from "./middleware/trustProxy";
 import { httpLogger } from "./logger";
 import { metricsRequestObserver } from "./middleware/metricsHttp";
 import { clientApiKeyGate } from "./middleware/clientApiKey";
 import { apiNotFound } from "./middleware/apiErrors";
+import { asyncHandler } from "./middleware/asyncHandler";
 import { register as metricsRegister } from "./metrics/register";
 import { DEFAULT_COMPRESSION_THRESHOLD_BYTES } from "./constants";
 import { isDraining } from "./runtime/lifecycle";
@@ -37,22 +38,27 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
-app.get("/ready", (_req, res) => {
+app.get("/ready", asyncHandler(async (_req, res) => {
   if (isDraining()) {
     res.status(503).json({ status: "draining" });
     return;
   }
-  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
-    res.json({ status: "ready" });
-    return;
+  if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") {
+    const key = process.env.GNEWS_API_KEY?.trim();
+    if (!key) {
+      res.status(503).json({ status: "not_ready", reason: "missing_api_key" });
+      return;
+    }
   }
-  const key = process.env.GNEWS_API_KEY?.trim();
-  if (!key) {
-    res.status(503).json({ status: "not_ready", reason: "missing_api_key" });
+  if (!(await isRateLimitStoreReady())) {
+    res.status(503).json({
+      status: "not_ready",
+      reason: "rate_limit_store_unavailable",
+    });
     return;
   }
   res.json({ status: "ready" });
-});
+}));
 
 app.get("/openapi.yaml", (_req, res, next) => {
   if (!fs.existsSync(openApiFile)) {

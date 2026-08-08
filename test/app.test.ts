@@ -195,6 +195,42 @@ describe("app", () => {
     expect(health.body).toMatchObject({ status: "ok" });
   });
 
+  it("reports an unavailable required rate-limit store without failing liveness", async () => {
+    vi.stubEnv("REDIS_URL", "redis://redis.invalid:6379");
+    vi.stubEnv("DISABLE_RATE_LIMIT", "0");
+
+    try {
+      const [ready, health] = await Promise.all([
+        request(app).get("/ready"),
+        request(app).get("/health"),
+      ]);
+
+      expect(ready.status).toBe(503);
+      expect(ready.body).toEqual({
+        status: "not_ready",
+        reason: "rate_limit_store_unavailable",
+      });
+      expect(health.status).toBe(200);
+      expect(health.body).toMatchObject({ status: "ok" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("keeps cache-only Redis out of readiness when rate limiting is disabled", async () => {
+    vi.stubEnv("REDIS_URL", "redis://redis.invalid:6379");
+    vi.stubEnv("DISABLE_RATE_LIMIT", "1");
+
+    try {
+      const ready = await request(app).get("/ready");
+
+      expect(ready.status).toBe(200);
+      expect(ready.body).toEqual({ status: "ready" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("GET /openapi.yaml serves spec", async () => {
     const res = await request(app).get("/openapi.yaml");
     expect(res.status).toBe(200);
