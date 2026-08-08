@@ -9,6 +9,7 @@ RATE_LIMIT_B_URL="${RATE_LIMIT_B_URL:-http://127.0.0.1:3002}"
 RATE_LIMIT_CLIENT_IP="${RATE_LIMIT_CLIENT_IP:-198.51.100.42}"
 FAKE_GNEWS_URL="${FAKE_GNEWS_URL:-http://127.0.0.1:4010}"
 RATE_LIMIT_BODY="$(mktemp)"
+READINESS_BODY="$(mktemp)"
 CACHE_COORDINATION_BODY_A="$(mktemp)"
 CACHE_COORDINATION_BODY_B="$(mktemp)"
 CACHE_COORDINATION_STATUS_A="$(mktemp)"
@@ -20,7 +21,7 @@ cleanup() {
     docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" logs --no-color || true
   fi
   docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" down -v --remove-orphans || true
-  rm -f "$RATE_LIMIT_BODY" "$CACHE_COORDINATION_BODY_A" "$CACHE_COORDINATION_BODY_B" "$CACHE_COORDINATION_STATUS_A" "$CACHE_COORDINATION_STATUS_B"
+  rm -f "$RATE_LIMIT_BODY" "$READINESS_BODY" "$CACHE_COORDINATION_BODY_A" "$CACHE_COORDINATION_BODY_B" "$CACHE_COORDINATION_STATUS_A" "$CACHE_COORDINATION_STATUS_B"
   exit "$status"
 }
 
@@ -40,6 +41,28 @@ wait_for_ready() {
 
     if [ "$attempt" -eq 30 ]; then
       echo "FAIL $name did not become ready at $url"
+      return 1
+    fi
+
+    attempt=$((attempt + 1))
+    sleep 2
+  done
+}
+
+wait_for_rate_limit_store_failure() {
+  name="$1"
+  url="$2"
+  attempt=1
+  while [ "$attempt" -le 30 ]; do
+    status="$(curl -sS -o "$READINESS_BODY" -w "%{http_code}" "$url/ready" || true)"
+    if [ "$status" = "503" ] && grep -q 'rate_limit_store_unavailable' "$READINESS_BODY"; then
+      echo "UNREADY $name ($url): rate-limit store unavailable"
+      return 0
+    fi
+
+    if [ "$attempt" -eq 30 ]; then
+      echo "FAIL $name did not report the unavailable rate-limit store"
+      cat "$READINESS_BODY"
       return 1
     fi
 
@@ -124,3 +147,27 @@ fi
 echo "OK   cross-replica cache coordination (one upstream call)"
 
 BASE_URL="$BASE_URL" QUERY="${QUERY:-ci-smoke}" COUNT="${COUNT:-3}" PAGE="${PAGE:-2}" npm run smoke
+
+docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" stop redis
+wait_for_rate_limit_store_failure "rate-limit-a" "$RATE_LIMIT_A_URL"
+wait_for_rate_limit_store_failure "rate-limit-b" "$RATE_LIMIT_B_URL"
+
+cache_only_status="$(curl -sS -o "$READINESS_BODY" -w "%{http_code}" "$BASE_URL/ready" || true)"
+if [ "$cache_only_status" != "200" ]; then
+  echo "FAIL cache-only replica became unready when Redis stopped: HTTP $cache_only_status"
+  cat "$READINESS_BODY"
+  exit 1
+fi
+echo "OK   cache-only replica remains ready without Redis (200)"
+
+for url in "$RATE_LIMIT_A_URL" "$RATE_LIMIT_B_URL"; do
+  if ! curl -fsS "$url/health" >/dev/null; then
+    echo "FAIL rate-limited replica liveness failed while Redis was stopped: $url"
+    exit 1
+  fi
+done
+echo "OK   rate-limited replica liveness remains healthy without Redis"
+
+docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" start redis
+wait_for_ready "rate-limit-a recovered" "$RATE_LIMIT_A_URL"
+wait_for_ready "rate-limit-b recovered" "$RATE_LIMIT_B_URL"
