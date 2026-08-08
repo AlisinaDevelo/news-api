@@ -28,6 +28,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Workflow action pins
+        if: matrix.node-version == '20'
+        run: npm run workflow:check
+
       - name: Audit dependencies
         run: npm audit --audit-level=high
 

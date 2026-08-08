@@ -17,6 +17,7 @@
     "contract": "redocly lint docs/openapi.yaml",
     "client:generate": "node scripts/generate-client-types.mjs",
     "client:check": "npm run client:generate && git diff --exit-code -- src/client/openapi-types.ts",
+    "workflow:check": "node scripts/check-workflow-action-pins.mjs",
     "smoke": "sh scripts/smoke-test.sh",
     "smoke:docker": "sh scripts/docker-compose-smoke.sh",
     "benchmark:local": "npm run build && node scripts/local-benchmark.mjs"
