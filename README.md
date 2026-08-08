@@ -109,7 +109,9 @@ JSON request bodies are strictly parsed with a 32768-byte default limit, configu
 `SERVER_MAX_JSON_BODY_BYTES` up to 262144 bytes. Oversized bodies return `413` with
 `request_body_too_large`; malformed JSON returns `400` with `invalid_json_body` on versioned
 routes. The `news_http_body_errors_total{type}` metric records parser failures without raw bodies
-or parser messages.
+or parser messages. Parsing is scoped to `/api` after rate limiting and API-key authentication;
+request bodies with `Content-Encoding: gzip`, `br`, or `deflate` return `415` with
+`unsupported_content_encoding` before inflation.
 
 **Examples**
 

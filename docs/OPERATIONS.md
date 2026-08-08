@@ -104,7 +104,9 @@ operator override. Oversized entities return `413`; malformed JSON returns `400`
 encoding or charset returns `415`. These responses use fixed public messages and, on `/api/v1/*`,
 stable error codes plus the normalized request ID. Body-parser errors can carry the failed body,
 so the error handler logs only the fixed parser type and status and increments
-`news_http_body_errors_total{type=...}`.
+`news_http_body_errors_total{type=...}`. Parsing is scoped to `/api` after rate limiting and
+API-key authentication. Request inflation is disabled, so `Content-Encoding: gzip`, `br`, or
+`deflate` returns `415` with `unsupported_content_encoding` before decompression.
 
 Warnings for malformed transport input and per-socket request drops use an independent budget per
 fixed event label. `SERVER_TRANSPORT_LOG_BURST` and `SERVER_TRANSPORT_LOG_WINDOW_MS` bound log

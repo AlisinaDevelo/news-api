@@ -14,7 +14,7 @@ flowchart LR
 ```
 
 1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented. `src/server.ts` creates a Node `http.Server` with explicit request/header/keep-alive/socket-reuse limits before listening.
-2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), privacy-safe **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, strict JSON parsing with an explicit `SERVER_MAX_JSON_BODY_BYTES` limit, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`; uses shared Redis quotas when configured), then mounts `/api` routes.
+2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), privacy-safe **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`; uses shared Redis quotas when configured), then mounts `/api` with the client API-key gate followed by strict JSON parsing under the explicit `SERVER_MAX_JSON_BODY_BYTES` limit.
 3. **Controllers** validate query parameters, create a response-lifecycle abort signal, and map domain results to HTTP status codes.
 4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `page`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and when Redis is active coordinates cold misses with a short owner-token lease plus a half-TTL heartbeat during slow loads. It tracks each caller as a subscriber and delegates upstream fetches to the GNews provider adapter. A disconnected subscriber stops awaiting the shared promise; the shared provider is aborted only when no subscribers remain. Cache and lease backend errors are logged and metriced without failing the article request.
 5. **Provider adapter** composes the client signal with process shutdown and a cancelable total deadline, maps domain search options to GNews parameters, validates provider payloads, records upstream metrics, and opens a short circuit after repeated provider failures so outages are shed locally instead of amplified. Explicit cancellation is not retried, counted as a circuit failure, or served from stale fallback; total-budget exhaustion is a transient provider failure.
@@ -106,7 +106,9 @@ Express's strict JSON parser uses `SERVER_MAX_JSON_BODY_BYTES` with a 32768-byte
 262144-byte maximum. It turns oversized entities into `413`, malformed JSON into `400`, and
 unsupported encodings/charsets into `415`. The error handler returns fixed legacy or versioned
 contracts, increments `news_http_body_errors_total{type=...}`, and logs only the fixed parser type
-and status because parser errors may carry the failed body.
+and status because parser errors may carry the failed body. The parser is mounted only under
+`/api`, after rate limiting and API-key authentication, and request inflation is disabled because
+the service has no compressed request-body contract.
 
 ## Errors
 
