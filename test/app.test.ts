@@ -29,6 +29,7 @@ import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
 import { resetNewsServiceForTests } from "../src/services/newsService";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../src/constants";
 import { beginDraining, resetLifecycleForTests } from "../src/runtime/lifecycle";
+import { requestIdRejectionsTotal } from "../src/metrics/register";
 
 function axiosErrorWithStatus(
   status: number,
@@ -46,6 +47,31 @@ describe("app", () => {
     resetGNewsCircuitForTests();
     resetNewsServiceForTests();
     resetLifecycleForTests();
+    requestIdRejectionsTotal.reset();
+  });
+
+  afterEach(() => {
+    requestIdRejectionsTotal.reset();
+  });
+
+  it("preserves safe request IDs and replaces oversized client IDs", async () => {
+    const accepted = await request(app).get("/health").set("X-Request-Id", "trace_2026/08");
+    expect(accepted.headers["x-request-id"]).toBe("trace_2026/08");
+
+    const rejected = await request(app)
+      .get("/health")
+      .set("X-Request-Id", "x".repeat(129));
+    expect(rejected.headers["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(rejected.headers["x-request-id"]).not.toBe("x".repeat(129));
+
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const versioned = await request(app)
+      .get("/api/v1/articles?query=request-id-contract")
+      .set("X-Request-Id", "x".repeat(129));
+    expect(versioned.body.meta.requestId).toBe(versioned.headers["x-request-id"]);
+
+    const metrics = await request(app).get("/metrics");
+    expect(metrics.text).toContain("news_request_id_rejections_total 2");
   });
 
   it("GET /health returns ok", async () => {

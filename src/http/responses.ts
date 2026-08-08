@@ -1,17 +1,11 @@
 import type { Request, Response } from "express";
+import { normalizeRequestId } from "./requestId";
 
 type RequestWithId = Request & { id?: unknown };
 
 export function requestId(req: Request): string {
   const id = (req as RequestWithId).id;
-  if (typeof id === "string" && id.trim()) {
-    return id;
-  }
-  const header = req.headers["x-request-id"];
-  if (typeof header === "string" && header.trim()) {
-    return header;
-  }
-  return "unknown";
+  return normalizeRequestId(id) ?? normalizeRequestId(req.headers["x-request-id"]) ?? "unknown";
 }
 
 export function sendEnvelope<TData, TMeta extends Record<string, unknown>>(

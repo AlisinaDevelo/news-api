@@ -25,6 +25,12 @@ export const httpServerLogSuppressedTotal = new Counter({
   registers: [register],
 });
 
+export const requestIdRejectionsTotal = new Counter({
+  name: "news_request_id_rejections_total",
+  help: "Total client request IDs rejected by the HTTP logging boundary",
+  registers: [register],
+});
+
 export const cacheEventsTotal = new Counter({
   name: "news_cache_events_total",
   help: "Total news search cache lookups by result",
