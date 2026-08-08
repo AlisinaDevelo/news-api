@@ -324,6 +324,25 @@ export interface components {
         };
     };
     responses: {
+        /** @description The selected v1 article representation matches If-None-Match; the response has no body. */
+        V1SearchNotModified: {
+            headers: {
+                ETag: components["headers"]["ETag"];
+                "X-API-Version": components["headers"]["ApiVersion"];
+                "X-Cache-Status": components["headers"]["CacheStatus"];
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
+        /** @description The selected v1 representation matches If-None-Match; the response has no body. */
+        V1NotModified: {
+            headers: {
+                ETag: components["headers"]["ETag"];
+                "X-API-Version": components["headers"]["ApiVersion"];
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
         /** @description Missing or invalid X-API-Key when CLIENT_API_KEYS is configured */
         Unauthorized: {
             headers: {
@@ -464,6 +483,8 @@ export interface components {
     parameters: {
         /** @description Required when the server sets CLIENT_API_KEYS. */
         ClientApiKey: string;
+        /** @description Optional entity-tag validator. A matching weak tag or `*` returns 304 without a response body. */
+        IfNoneMatch: string;
         Query: string;
         Count: number;
         /** @description Upstream result page. GNews pagination may require a paid plan. */
@@ -484,7 +505,9 @@ export interface components {
         /** @description Version of the stable response envelope contract. */
         ApiVersion: "v1";
         /** @description Article-search cache result for this response. */
-        CacheStatus: "hit" | "miss" | "stale";
+        CacheStatus: "hit" | "miss" | "coalesced" | "stale";
+        /** @description Weak validator for the stable v1 representation. Use with If-None-Match. */
+        ETag: string;
         /** @description Normalized upstream retry delay in delta-seconds, capped at 86400 seconds. */
         RetryAfter: string;
         /** @description Combined draft-8 rate-limit policy state. */
@@ -628,6 +651,8 @@ export interface operations {
             header?: {
                 /** @description Required when the server sets CLIENT_API_KEYS. */
                 "X-API-Key"?: components["parameters"]["ClientApiKey"];
+                /** @description Optional entity-tag validator. A matching weak tag or `*` returns 304 without a response body. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
             };
             path?: never;
             cookie?: never;
@@ -639,12 +664,14 @@ export interface operations {
                 headers: {
                     "X-API-Version": components["headers"]["ApiVersion"];
                     "X-Cache-Status": components["headers"]["CacheStatus"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ArticleSearchEnvelope"];
                 };
             };
+            304: components["responses"]["V1SearchNotModified"];
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
             405: components["responses"]["V1MethodNotAllowed"];
@@ -675,6 +702,8 @@ export interface operations {
             header?: {
                 /** @description Required when the server sets CLIENT_API_KEYS. */
                 "X-API-Key"?: components["parameters"]["ClientApiKey"];
+                /** @description Optional entity-tag validator. A matching weak tag or `*` returns 304 without a response body. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
             };
             path?: never;
             cookie?: never;
@@ -686,12 +715,14 @@ export interface operations {
                 headers: {
                     "X-API-Version": components["headers"]["ApiVersion"];
                     "X-Cache-Status": components["headers"]["CacheStatus"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ArticleSearchEnvelope"];
                 };
             };
+            304: components["responses"]["V1SearchNotModified"];
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
             405: components["responses"]["V1MethodNotAllowed"];
@@ -707,6 +738,8 @@ export interface operations {
             header?: {
                 /** @description Required when the server sets CLIENT_API_KEYS. */
                 "X-API-Key"?: components["parameters"]["ClientApiKey"];
+                /** @description Optional entity-tag validator. A matching weak tag or `*` returns 304 without a response body. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
             };
             path: {
                 title: string;
@@ -719,12 +752,14 @@ export interface operations {
             200: {
                 headers: {
                     "X-API-Version": components["headers"]["ApiVersion"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ArticleEnvelope"];
                 };
             };
+            304: components["responses"]["V1NotModified"];
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
             /** @description No article with that title in the search window */
@@ -763,6 +798,8 @@ export interface operations {
             header?: {
                 /** @description Required when the server sets CLIENT_API_KEYS. */
                 "X-API-Key"?: components["parameters"]["ClientApiKey"];
+                /** @description Optional entity-tag validator. A matching weak tag or `*` returns 304 without a response body. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
             };
             path: {
                 source: string;
@@ -775,12 +812,14 @@ export interface operations {
             200: {
                 headers: {
                     "X-API-Version": components["headers"]["ApiVersion"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["SourceArticlesEnvelope"];
                 };
             };
+            304: components["responses"]["V1NotModified"];
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
             405: components["responses"]["V1MethodNotAllowed"];

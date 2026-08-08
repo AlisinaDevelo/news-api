@@ -96,6 +96,7 @@ paths:
         - {}
       parameters:
         - $ref: "#/components/parameters/ClientApiKey"
+        - $ref: "#/components/parameters/IfNoneMatch"
         - $ref: "#/components/parameters/Query"
         - $ref: "#/components/parameters/Count"
         - $ref: "#/components/parameters/Page"
@@ -112,10 +113,14 @@ paths:
               $ref: "#/components/headers/ApiVersion"
             X-Cache-Status:
               $ref: "#/components/headers/CacheStatus"
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ArticleSearchEnvelope"
+        "304":
+          $ref: "#/components/responses/V1SearchNotModified"
         "400":
           $ref: "#/components/responses/V1BadRequest"
         "405":
@@ -140,6 +145,7 @@ paths:
         - {}
       parameters:
         - $ref: "#/components/parameters/ClientApiKey"
+        - $ref: "#/components/parameters/IfNoneMatch"
         - $ref: "#/components/parameters/Query"
         - $ref: "#/components/parameters/Count"
         - $ref: "#/components/parameters/Page"
@@ -156,10 +162,14 @@ paths:
               $ref: "#/components/headers/ApiVersion"
             X-Cache-Status:
               $ref: "#/components/headers/CacheStatus"
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ArticleSearchEnvelope"
+        "304":
+          $ref: "#/components/responses/V1SearchNotModified"
         "400":
           $ref: "#/components/responses/V1BadRequest"
         "405":
@@ -184,6 +194,7 @@ paths:
         - {}
       parameters:
         - $ref: "#/components/parameters/ClientApiKey"
+        - $ref: "#/components/parameters/IfNoneMatch"
         - name: title
           in: path
           required: true
@@ -196,10 +207,14 @@ paths:
           headers:
             X-API-Version:
               $ref: "#/components/headers/ApiVersion"
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ArticleEnvelope"
+        "304":
+          $ref: "#/components/responses/V1NotModified"
         "400":
           $ref: "#/components/responses/V1BadRequest"
         "405":
@@ -230,6 +245,7 @@ paths:
         - {}
       parameters:
         - $ref: "#/components/parameters/ClientApiKey"
+        - $ref: "#/components/parameters/IfNoneMatch"
         - name: source
           in: path
           required: true
@@ -249,10 +265,14 @@ paths:
           headers:
             X-API-Version:
               $ref: "#/components/headers/ApiVersion"
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SourceArticlesEnvelope"
+        "304":
+          $ref: "#/components/responses/V1NotModified"
         "400":
           $ref: "#/components/responses/V1BadRequest"
         "405":
@@ -524,6 +544,13 @@ components:
       schema:
         type: string
       description: Required when the server sets CLIENT_API_KEYS.
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Optional entity-tag validator. A matching weak tag or `*` returns 304 without a response body.
     Query:
       name: query
       in: query
@@ -601,7 +628,12 @@ components:
       description: Article-search cache result for this response.
       schema:
         type: string
-        enum: [hit, miss, stale]
+        enum: [hit, miss, coalesced, stale]
+    ETag:
+      description: Weak validator for the stable v1 representation. Use with If-None-Match.
+      schema:
+        type: string
+        example: 'W/"sha256-example"'
     RetryAfter:
       description: Normalized upstream retry delay in delta-seconds, capped at 86400 seconds.
       schema:
@@ -623,6 +655,22 @@ components:
         example: "GET, HEAD, OPTIONS"
 
   responses:
+    V1SearchNotModified:
+      description: The selected v1 article representation matches If-None-Match; the response has no body.
+      headers:
+        ETag:
+          $ref: "#/components/headers/ETag"
+        X-API-Version:
+          $ref: "#/components/headers/ApiVersion"
+        X-Cache-Status:
+          $ref: "#/components/headers/CacheStatus"
+    V1NotModified:
+      description: The selected v1 representation matches If-None-Match; the response has no body.
+      headers:
+        ETag:
+          $ref: "#/components/headers/ETag"
+        X-API-Version:
+          $ref: "#/components/headers/ApiVersion"
     Unauthorized:
       description: Missing or invalid X-API-Key when CLIENT_API_KEYS is configured
       content:
