@@ -10,7 +10,7 @@ A search runs through a small, explicit pipeline — each stage is a separate, t
 2. **Cache** — parameters are normalized into a deterministic key and read through a pluggable store (in-memory by default, Redis when `REDIS_URL` is set). Cache failures are logged/metriced but do not fail article requests; identical in-flight misses share one upstream call per process, and Redis-backed replicas coordinate cold misses with a renewable bounded lease.
 3. **Upstream** — on a miss, GNews is called with a hard timeout; transport/provider failures surface as `502`, and repeated failures open a short circuit that returns `503` without amplifying the outage. Recovery admits one half-open probe at a time.
 4. **Observe** — each step emits privacy-safe structured Pino logs (carrying a bounded `x-request-id`), Prometheus counters (cache hit/miss/stale fallback/coalescing/cancellation, upstream outcome, transport events, suppressed transport warnings, and request-ID rejections, latency histogram), and optional OpenTelemetry spans.
-5. **Respond** — legacy endpoints return raw article arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with request/cache metadata, `X-API-Version`, cache-status headers for searches, and structured error bodies.
+5. **Respond** — legacy endpoints return raw article arrays, while `/api/v1/*` returns `{ data, meta }` envelopes with request/cache metadata, `X-API-Version`, cache-status headers for searches, weak `ETag` validators, conditional `304` responses, and structured error bodies.
 
 Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -22,7 +22,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 - **Observability:** privacy-safe JSON access logs via [Pino](https://getpino.io/) with bounded `x-request-id` correlation, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss/stale/error/coalescing/coordination/eviction + request cancellation + rate-limit store + upstream latency/circuit + pre-Express transport-event, warning-suppression, and request-ID rejection metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`) with low-cardinality search, cache, retry, circuit, upstream, and stale-fallback spans.
 - **Kubernetes-style probes:** `GET /health` (process liveness), `GET /ready` (provider configuration, graceful drain state, and bounded rate-limit Redis availability when that fail-closed store is enabled).
 - **Supply chain:** `npm audit` in CI; **SPDX SBOM** artifacts; Docker builds with **SBOM + provenance**; **dependency review** on PRs; fail-closed **SLSA-style lockfile attestation** on `main`; full-SHA-pinned GitHub Actions and tag-plus-digest-pinned Docker images with CI guards; lockfile-only installs.
-- **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
+- **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)), including conditional `ETag`/`If-None-Match` behavior for v1 reads.
 - **Container:** multi-stage [Dockerfile](Dockerfile) with reviewed tag-plus-digest frontend/base images, a non-root user, and a healthcheck.
 - **Deploy:** Example [Kubernetes manifests](deploy/k8s/).
 
@@ -97,7 +97,7 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 | `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` is missing, required rate-limit Redis is unavailable, or the process is draining (non-test). Cache-only Redis does not gate readiness. |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
 | `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, pre-Express transport events, cache hit/miss/stale/error/coalescing counts, and upstream latency. |
-| `GET` | `/api/v1/articles` | Versioned search. Returns `{ data, meta }`, including `count`, `page`, normalized filters, cache status, and `requestId`. |
+| `GET` | `/api/v1/articles` | Versioned search. Returns `{ data, meta }`, including `count`, `page`, normalized filters, cache status, and `requestId`; supports `ETag`/`If-None-Match`. |
 | `GET` | `/api/v1/articles/search` | Alias for versioned search. |
 | `GET` | `/api/v1/articles/title/:title` | Exact title match with `{ data, meta }`, else structured `404`. |
 | `GET` | `/api/v1/sources/:source/articles` | Source-name filter with `{ data, meta }`, including `count`, `page`, and normalized filters. |
@@ -133,7 +133,7 @@ GET /api/articles/source?source=BBC&count=10
 
 Search parameters are validated before the upstream request. `page` is bounded to 100, `lang` and `country` are two-letter codes, `from` and `to` must parse as ISO 8601 dates, and `sortBy` accepts `publishedAt` or `relevance`. GNews pagination may require a paid plan.
 
-Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses include `X-API-Version: v1`; v1 search responses also include `X-Cache-Status: hit|miss|stale`. Versioned errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Client and provider rate limits use `429` with standard headers; upstream throttling adds `Retry-After` when the provider supplies a valid value. Upstream temporary failures use `503` with `upstream_unavailable`.
+Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses include `X-API-Version: v1` and a weak `ETag`; v1 search responses also include `X-Cache-Status: hit|miss|coalesced|stale`. Send the returned tag in `If-None-Match` on a later `GET` or `HEAD`; a weak match returns `304 Not Modified` with no body. The validator excludes per-request IDs and cache-state metadata, so cache hits and misses can reuse it when the article representation is unchanged. Versioned errors: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Client and provider rate limits use `429` with standard headers; upstream throttling adds `Retry-After` when the provider supplies a valid value. Upstream temporary failures use `503` with `upstream_unavailable`.
 
 ## Scripts
 

@@ -54,5 +54,13 @@ try {
 For upstream throttling or temporary unavailability, `NewsApiClientError.retryAfter` contains the
 validated `Retry-After` delta-seconds value when the API received one.
 
+## Conditional GETs
+
+Every successful `/api/v1/*` read returns a weak `ETag`. Send that value as `If-None-Match` on a
+later `GET` or `HEAD` request. When the selected representation is unchanged, the API returns
+`304 Not Modified` with the current `ETag` and no body. The small convenience methods above always
+return a fresh `200` envelope; use the OpenAPI contract or a direct `fetch` call when the caller
+needs to manage a conditional request and retain its cached envelope.
+
 The wrapper intentionally targets `/api/v1/*` only. Legacy `/api/articles*` routes remain
 available for backward compatibility, but new consumers should use v1 envelopes.
