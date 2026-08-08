@@ -14,7 +14,7 @@ flowchart LR
 ```
 
 1. **Process** — `dotenv` loads first; **`otel-bootstrap`** starts OpenTelemetry when an OTLP endpoint (or `OTEL_TRACING_ENABLED=1`) is configured, before Express loads so HTTP is instrumented. `src/server.ts` creates a Node `http.Server` with explicit request/header/keep-alive/socket-reuse limits before listening.
-2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), privacy-safe **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, JSON body parser, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`; uses shared Redis quotas when configured), then mounts `/api` routes.
+2. **Express** (`src/app.ts`) applies middleware in order: trust-proxy (optional), privacy-safe **Pino** request logging, **metrics** observer, **Helmet**, response compression for payloads at or above 1 KiB, strict JSON parsing with an explicit `SERVER_MAX_JSON_BODY_BYTES` limit, **rate limiting** (skips `/health`, `/ready`, `/openapi.yaml`, `/metrics`; uses shared Redis quotas when configured), then mounts `/api` routes.
 3. **Controllers** validate query parameters, create a response-lifecycle abort signal, and map domain results to HTTP status codes.
 4. **News service** builds cache keys from normalized search parameters (`query`, `count`, `page`, `lang`, `country`, `from`, `to`, `sortBy`), reads through `getCacheStore()` (in-memory or **Redis** when `REDIS_URL` is set), coalesces identical in-flight misses per process, and when Redis is active coordinates cold misses with a short owner-token lease plus a half-TTL heartbeat during slow loads. It tracks each caller as a subscriber and delegates upstream fetches to the GNews provider adapter. A disconnected subscriber stops awaiting the shared promise; the shared provider is aborted only when no subscribers remain. Cache and lease backend errors are logged and metriced without failing the article request.
 5. **Provider adapter** composes the client signal with process shutdown and a cancelable total deadline, maps domain search options to GNews parameters, validates provider payloads, records upstream metrics, and opens a short circuit after repeated provider failures so outages are shed locally instead of amplified. Explicit cancellation is not retried, counted as a circuit failure, or served from stale fallback; total-budget exhaustion is a transient provider failure.
@@ -86,7 +86,7 @@ to the shared store drawn above.
 
 ## HTTP transport
 
-The application server has explicit limits for incomplete requests, header size, and connection reuse:
+The application server has explicit limits for incomplete requests, header/body size, and connection reuse:
 `SERVER_HEADERS_TIMEOUT_MS` protects slow header delivery, `SERVER_REQUEST_TIMEOUT_MS` bounds
 receipt of the complete request, `SERVER_MAX_HEADER_SIZE_BYTES` bounds incoming header bytes,
 `SERVER_KEEP_ALIVE_TIMEOUT_MS` retires idle connections, and `SERVER_MAX_REQUESTS_PER_SOCKET`
@@ -102,9 +102,15 @@ through `news_http_server_log_suppressed_total`. Express access logs use an allo
 request ID, method, bounded pathname, response status, and response time; headers, query strings,
 bodies, remote address/port, and arbitrary request objects are excluded.
 
+Express's strict JSON parser uses `SERVER_MAX_JSON_BODY_BYTES` with a 32768-byte default and a
+262144-byte maximum. It turns oversized entities into `413`, malformed JSON into `400`, and
+unsupported encodings/charsets into `415`. The error handler returns fixed legacy or versioned
+contracts, increments `news_http_body_errors_total{type=...}`, and logs only the fixed parser type
+and status because parser errors may carry the failed body.
+
 ## Errors
 
-Unhandled promise rejections in async route handlers are forwarded by `asyncHandler` to Express. Legacy endpoints keep the original JSON `{ "error": "..." }` shape for compatibility. Versioned `/api/v1/*` endpoints return structured errors with stable machine-readable codes: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`.
+Unhandled promise rejections in async route handlers are forwarded by `asyncHandler` to Express. Legacy endpoints keep the original JSON `{ "error": "..." }` shape for compatibility. Versioned `/api/v1/*` endpoints return structured errors with stable machine-readable codes: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Body-parser failures use `request_body_too_large` for `413` and `invalid_json_body` for `400`.
 
 ## Caching
 
@@ -144,4 +150,4 @@ protect the span names, bounded attributes, and PII boundary.
 
 ## Metrics
 
-`src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts, the runtime HTTP adapter records pre-Express transport events, while `newsService` and the provider adapter record cache hits/misses/errors/coalesced/stale misses, upstream request outcomes, upstream latency buckets, and circuit breaker events.
+`src/metrics/register.ts` exports a single Prometheus registry used by `/metrics`. HTTP middleware records response counts and body-parser failures, the runtime HTTP adapter records pre-Express transport events, while `newsService` and the provider adapter record cache hits/misses/errors/coalesced/stale misses, upstream request outcomes, upstream latency buckets, and circuit breaker events.

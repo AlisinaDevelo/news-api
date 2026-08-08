@@ -26,6 +26,7 @@
 | `SERVER_REQUEST_TIMEOUT_MS` | `75000` | Maximum time to receive a complete incoming HTTP request. Values above `120000` are clamped; keep it above `UPSTREAM_TOTAL_TIMEOUT_MS` when provider work can run to its budget. Node returns `408` when this expires. |
 | `SERVER_HEADERS_TIMEOUT_MS` | `10000` | Maximum time to receive complete HTTP headers. Values above `60000` and values above the request timeout are clamped; Node returns `408` when this expires. |
 | `SERVER_MAX_HEADER_SIZE_BYTES` | `16384` | Maximum incoming request-header bytes. Values above `65536` are clamped; oversized headers return `431` and increment `header_overflow`. |
+| `SERVER_MAX_JSON_BODY_BYTES` | `32768` | Maximum `application/json` request-body bytes parsed by Express. Values above `262144` are clamped; oversized bodies return `413` and increment `news_http_body_errors_total{type="entity.too.large"}`. |
 | `SERVER_TRANSPORT_LOG_BURST` | `10` | Maximum warning logs per fixed transport event label during one window. Values above `100` are clamped; all events remain metriced. |
 | `SERVER_TRANSPORT_LOG_WINDOW_MS` | `60000` | Window for the per-event transport warning budget. Values above `300000` ms are clamped. |
 | `SERVER_KEEP_ALIVE_TIMEOUT_MS` | `5000` | Idle time after a response before the HTTP server closes a keep-alive socket. Values above `120000` are clamped. |
@@ -98,6 +99,13 @@ keep-alive sockets are closed after `SERVER_KEEP_ALIVE_TIMEOUT_MS`, and a socket
 `SERVER_MAX_REQUESTS_PER_SOCKET` requests. A reverse proxy may impose stricter limits, but should
 keep its request, header, and idle budgets compatible with these application settings.
 
+Express parses only JSON bodies and applies a 32768-byte default limit, with a 262144-byte maximum
+operator override. Oversized entities return `413`; malformed JSON returns `400`; unsupported
+encoding or charset returns `415`. These responses use fixed public messages and, on `/api/v1/*`,
+stable error codes plus the normalized request ID. Body-parser errors can carry the failed body,
+so the error handler logs only the fixed parser type and status and increments
+`news_http_body_errors_total{type=...}`.
+
 Warnings for malformed transport input and per-socket request drops use an independent budget per
 fixed event label. `SERVER_TRANSPORT_LOG_BURST` and `SERVER_TRANSPORT_LOG_WINDOW_MS` bound log
 volume without dropping telemetry: every event increments `news_http_server_events_total`, while
@@ -143,6 +151,7 @@ approximately ten-percent trace sample while preserving parent decisions.
 | `news_http_server_events_total` | `event=client_error|request_timeout|header_overflow|chunk_extensions_overflow|dropped_request` | Pre-Express parser errors and requests dropped after the per-socket request cap. |
 | `news_http_server_log_suppressed_total` | `event=client_error|request_timeout|header_overflow|chunk_extensions_overflow|dropped_request` | Transport warning logs skipped after the per-event burst budget was exhausted. |
 | `news_request_id_rejections_total` | — | Client request IDs rejected by the bounded HTTP logging boundary and replaced with generated IDs. |
+| `news_http_body_errors_total` | `type=entity.too.large|entity.parse.failed|request.aborted|request.size.invalid|encoding.unsupported|charset.unsupported|entity.verify.failed|parameters.too.many` | JSON/body-parser failures returned to clients without logging raw bodies or parser messages. |
 | `news_cache_events_total` | `result=hit|miss|error|coalesced|stale` | Cache lookup, stale fallback, and in-flight coalescing behavior for article searches. |
 | `news_cache_errors_total` | `operation=get|set|get_stale|set_stale|delete|delete_stale` | Cache backend errors that were tolerated by falling through to upstream, returning an uncached upstream response, skipping stale fallback, or failing to quarantine a corrupt entry. |
 | `news_cache_evictions_total` | — | Least-recently-used entries evicted from the bounded in-process cache. |

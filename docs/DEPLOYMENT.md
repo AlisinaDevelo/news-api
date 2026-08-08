@@ -23,6 +23,7 @@ Set these variables on the hosting platform:
 | `SERVER_REQUEST_TIMEOUT_MS` | `75000` | Complete incoming request budget; keep above `UPSTREAM_TOTAL_TIMEOUT_MS`. Values above `120000` ms are clamped. |
 | `SERVER_HEADERS_TIMEOUT_MS` | `10000` | Slow-header protection; values above `60000` ms and above the request budget are clamped. |
 | `SERVER_MAX_HEADER_SIZE_BYTES` | `16384` | Incoming request-header byte budget; values above `65536` are clamped and oversized headers return `431`. |
+| `SERVER_MAX_JSON_BODY_BYTES` | `32768` | Express JSON request-body byte budget; values above `262144` are clamped and oversized bodies return `413`. |
 | `SERVER_TRANSPORT_LOG_BURST` | `10` | Maximum warning logs per transport event label per window; values above `100` are clamped. |
 | `SERVER_TRANSPORT_LOG_WINDOW_MS` | `60000` | Transport warning-log window; values above `300000` ms are clamped. |
 | `SERVER_KEEP_ALIVE_TIMEOUT_MS` | `5000` | Idle keep-alive socket budget. Values above `120000` ms are clamped. |
@@ -98,8 +99,10 @@ that deadline; the image declares `STOPSIGNAL SIGTERM` explicitly.
 
 Keep the platform or reverse-proxy request timeout above `SERVER_REQUEST_TIMEOUT_MS` and
 `UPSTREAM_TOTAL_TIMEOUT_MS` so the application can return its normal structured errors. Proxy
-header and keep-alive limits may be stricter, but should be intentional and documented alongside
-the application settings. Transport-level parser errors and requests rejected after the socket
+header, body-size, and keep-alive limits may be stricter, but should be intentional and documented
+alongside the application settings. Express body parsing uses `SERVER_MAX_JSON_BODY_BYTES` and
+returns `413` for oversized JSON, `400` for malformed JSON, and `415` for unsupported encoding or
+charset. Transport-level parser errors and requests rejected after the socket
 request cap are still visible through `news_http_server_events_total`, even though they bypass
 Express request middleware; the application preserves Node's 400/408/431/413 responses and
 closes affected sockets. Warning emission is bounded independently per event label by

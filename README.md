@@ -17,6 +17,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 ## Production-oriented features
 
 - **Security:** [Helmet](https://helmetjs.github.io/) headers, configurable rate limiting with draft-8 standard headers and shared Redis quotas, optional `TRUST_PROXY` for correct client IPs behind a load balancer, optional **`CLIENT_API_KEYS`** + `X-API-Key` on `/api/*`.
+- **Request boundary:** Strict JSON parsing with a 32768-byte default body limit, a bounded `SERVER_MAX_JSON_BODY_BYTES` override up to 262144 bytes, and fixed 400/413/415 parser responses.
 - **Reliability:** Per-attempt and total upstream deadlines, explicit HTTP request/header-size/keep-alive/socket limits, response validation, bounded cache capacity, stale-on-error cache fallback, disconnect-aware cancellation, renewable owner-safe Redis cache-miss leases across replicas, bounded fail-fast Redis cache and rate-limit commands during reconnects, gzip compression for responses at or above 1 KiB, `502` for provider/transport failures, provider circuit breaker with `503` short-circuiting, graceful shutdown on `SIGTERM` / `SIGINT`.
 - **Observability:** privacy-safe JSON access logs via [Pino](https://getpino.io/) with bounded `x-request-id` correlation, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss/stale/error/coalescing/coordination/eviction + request cancellation + rate-limit store + upstream latency/circuit + pre-Express transport-event, warning-suppression, and request-ID rejection metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`) with low-cardinality search, cache, retry, circuit, upstream, and stale-fallback spans.
 - **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured; `503` while draining).
@@ -104,6 +105,12 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 | `GET` | `/api/articles/title/:title` | Exact title match in the current search window, else `404`. |
 | `GET` | `/api/articles/source` | Filter by `source.name` (case-insensitive). Query: `source` (required), `count` and `page` optional, plus optional `lang`, `country`, `from`, `to`, `sortBy`. |
 
+JSON request bodies are strictly parsed with a 32768-byte default limit, configurable through
+`SERVER_MAX_JSON_BODY_BYTES` up to 262144 bytes. Oversized bodies return `413` with
+`request_body_too_large`; malformed JSON returns `400` with `invalid_json_body` on versioned
+routes. The `news_http_body_errors_total{type}` metric records parser failures without raw bodies
+or parser messages.
+
 **Examples**
 
 ```http
@@ -146,7 +153,9 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses
 - `src/tracing.ts` / `src/otel-bootstrap.ts` — Optional OpenTelemetry (before Express loads).
 - `src/logger.ts` — Pino + request logging.
 - `src/middleware/` — Security headers, rate limit, trust proxy, metrics observer, optional client API key, errors.
+- `src/config/httpBody.ts` — Validated JSON request-body byte budget.
 - `src/http/responses.ts` — Versioned response envelope helpers.
+- `src/http/bodyParser.ts` — Fixed, privacy-safe body-parser error contracts.
 - `src/http/requestId.ts` — Shared request-ID validation and bounded access-log path policy.
 - `src/client/` — OpenAPI-generated TypeScript types and small v1 client wrapper.
 - `src/cache/store.ts` — Pluggable cache: memory or Redis.
