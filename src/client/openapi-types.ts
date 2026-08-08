@@ -328,6 +328,7 @@ export interface components {
         V1SearchNotModified: {
             headers: {
                 ETag: components["headers"]["ETag"];
+                "Cache-Control": components["headers"]["CacheControl"];
                 "X-API-Version": components["headers"]["ApiVersion"];
                 "X-Cache-Status": components["headers"]["CacheStatus"];
                 [name: string]: unknown;
@@ -338,6 +339,7 @@ export interface components {
         V1NotModified: {
             headers: {
                 ETag: components["headers"]["ETag"];
+                "Cache-Control": components["headers"]["CacheControl"];
                 "X-API-Version": components["headers"]["ApiVersion"];
                 [name: string]: unknown;
             };
@@ -508,6 +510,8 @@ export interface components {
         CacheStatus: "hit" | "miss" | "coalesced" | "stale";
         /** @description Weak validator for the stable v1 representation. Use with If-None-Match. */
         ETag: string;
+        /** @description Private-cache policy for v1 representations; clients must revalidate before reuse. */
+        CacheControl: "private, no-cache";
         /** @description Normalized upstream retry delay in delta-seconds, capped at 86400 seconds. */
         RetryAfter: string;
         /** @description Combined draft-8 rate-limit policy state. */
@@ -665,6 +669,7 @@ export interface operations {
                     "X-API-Version": components["headers"]["ApiVersion"];
                     "X-Cache-Status": components["headers"]["CacheStatus"];
                     ETag: components["headers"]["ETag"];
+                    "Cache-Control": components["headers"]["CacheControl"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -716,6 +721,7 @@ export interface operations {
                     "X-API-Version": components["headers"]["ApiVersion"];
                     "X-Cache-Status": components["headers"]["CacheStatus"];
                     ETag: components["headers"]["ETag"];
+                    "Cache-Control": components["headers"]["CacheControl"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -753,6 +759,7 @@ export interface operations {
                 headers: {
                     "X-API-Version": components["headers"]["ApiVersion"];
                     ETag: components["headers"]["ETag"];
+                    "Cache-Control": components["headers"]["CacheControl"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -813,6 +820,7 @@ export interface operations {
                 headers: {
                     "X-API-Version": components["headers"]["ApiVersion"];
                     ETag: components["headers"]["ETag"];
+                    "Cache-Control": components["headers"]["CacheControl"];
                     [name: string]: unknown;
                 };
                 content: {

@@ -115,6 +115,8 @@ paths:
               $ref: "#/components/headers/CacheStatus"
             ETag:
               $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
           content:
             application/json:
               schema:
@@ -164,6 +166,8 @@ paths:
               $ref: "#/components/headers/CacheStatus"
             ETag:
               $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
           content:
             application/json:
               schema:
@@ -209,6 +213,8 @@ paths:
               $ref: "#/components/headers/ApiVersion"
             ETag:
               $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
           content:
             application/json:
               schema:
@@ -267,6 +273,8 @@ paths:
               $ref: "#/components/headers/ApiVersion"
             ETag:
               $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
           content:
             application/json:
               schema:
@@ -634,6 +642,12 @@ components:
       schema:
         type: string
         example: 'W/"sha256-example"'
+    CacheControl:
+      description: Private-cache policy for v1 representations; clients must revalidate before reuse.
+      schema:
+        type: string
+        enum: ["private, no-cache"]
+        example: "private, no-cache"
     RetryAfter:
       description: Normalized upstream retry delay in delta-seconds, capped at 86400 seconds.
       schema:
@@ -660,6 +674,8 @@ components:
       headers:
         ETag:
           $ref: "#/components/headers/ETag"
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
         X-API-Version:
           $ref: "#/components/headers/ApiVersion"
         X-Cache-Status:
@@ -669,6 +685,8 @@ components:
       headers:
         ETag:
           $ref: "#/components/headers/ETag"
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
         X-API-Version:
           $ref: "#/components/headers/ApiVersion"
     Unauthorized:
