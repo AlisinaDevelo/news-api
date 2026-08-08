@@ -14,6 +14,7 @@ import { clientApiKeyGate } from "./middleware/clientApiKey";
 import { register as metricsRegister } from "./metrics/register";
 import { DEFAULT_COMPRESSION_THRESHOLD_BYTES } from "./constants";
 import { isDraining } from "./runtime/lifecycle";
+import { resolveServerMaxJsonBodyBytes } from "./config/httpBody";
 
 const openApiFile = path.resolve(process.cwd(), "docs", "openapi.yaml");
 
@@ -24,7 +25,7 @@ app.use(httpLogger);
 app.use(metricsRequestObserver);
 app.use(securityHeaders);
 app.use(compression({ threshold: DEFAULT_COMPRESSION_THRESHOLD_BYTES }));
-app.use(express.json());
+app.use(express.json({ limit: resolveServerMaxJsonBodyBytes(), strict: true }));
 app.use(apiRateLimiter);
 
 app.get("/health", (_req, res) => {

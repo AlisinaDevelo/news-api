@@ -29,7 +29,8 @@ import { resetGNewsCircuitForTests } from "../src/providers/gnewsProvider";
 import { resetNewsServiceForTests } from "../src/services/newsService";
 import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../src/constants";
 import { beginDraining, resetLifecycleForTests } from "../src/runtime/lifecycle";
-import { requestIdRejectionsTotal } from "../src/metrics/register";
+import { httpBodyErrorsTotal, requestIdRejectionsTotal } from "../src/metrics/register";
+import { resolveServerMaxJsonBodyBytes } from "../src/config/httpBody";
 
 function axiosErrorWithStatus(
   status: number,
@@ -48,10 +49,12 @@ describe("app", () => {
     resetNewsServiceForTests();
     resetLifecycleForTests();
     requestIdRejectionsTotal.reset();
+    httpBodyErrorsTotal.reset();
   });
 
   afterEach(() => {
     requestIdRejectionsTotal.reset();
+    httpBodyErrorsTotal.reset();
   });
 
   it("preserves safe request IDs and replaces oversized client IDs", async () => {
@@ -79,6 +82,35 @@ describe("app", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "ok" });
     expect(typeof res.body.uptime).toBe("number");
+  });
+
+  it("returns safe contracts for oversized and malformed JSON bodies", async () => {
+    const oversized = await request(app)
+      .post("/api/v1/articles")
+      .set("Content-Type", "application/json")
+      .set("X-Request-Id", "body-limit-test")
+      .send({ payload: "x".repeat(resolveServerMaxJsonBodyBytes() + 1000) });
+
+    expect(oversized.status).toBe(413);
+    expect(oversized.body).toEqual({
+      error: {
+        code: "request_body_too_large",
+        message: "Request body too large",
+        requestId: "body-limit-test",
+      },
+    });
+
+    const malformed = await request(app)
+      .post("/api/articles")
+      .set("Content-Type", "application/json")
+      .send('{"payload":');
+
+    expect(malformed.status).toBe(400);
+    expect(malformed.body).toEqual({ error: "Invalid JSON request body" });
+
+    const metrics = await request(app).get("/metrics");
+    expect(metrics.text).toContain('news_http_body_errors_total{type="entity.too.large"} 1');
+    expect(metrics.text).toContain('news_http_body_errors_total{type="entity.parse.failed"} 1');
   });
 
   it("GET /ready returns ready in test", async () => {

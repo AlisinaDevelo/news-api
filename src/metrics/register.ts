@@ -31,6 +31,13 @@ export const requestIdRejectionsTotal = new Counter({
   registers: [register],
 });
 
+export const httpBodyErrorsTotal = new Counter({
+  name: "news_http_body_errors_total",
+  help: "Total rejected HTTP request bodies by parser error type",
+  labelNames: ["type"],
+  registers: [register],
+});
+
 export const cacheEventsTotal = new Counter({
   name: "news_cache_events_total",
   help: "Total news search cache lookups by result",

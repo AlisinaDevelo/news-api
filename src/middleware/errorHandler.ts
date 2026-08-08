@@ -2,7 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import { HttpError } from "../errors/HttpError";
 import { logger } from "../logger";
 import { requestId } from "../http/responses";
+import { getBodyParserErrorContract } from "../http/bodyParser";
 import { isRequestAbortedError } from "../runtime/requestCancellation";
+import { httpBodyErrorsTotal } from "../metrics/register";
 
 /** Avoid `instanceof` alone: test runners may load duplicate class copies. */
 function isHttpError(err: unknown): err is HttpError {
@@ -69,6 +71,27 @@ export function errorHandler(
       return;
     }
     res.status(400).json({ error: message });
+    return;
+  }
+  const bodyParserError = getBodyParserErrorContract(err);
+  if (bodyParserError) {
+    httpBodyErrorsTotal.inc({ type: bodyParserError.type });
+    const logFields = {
+      statusCode: bodyParserError.statusCode,
+      type: bodyParserError.type,
+    };
+    log.warn(logFields, bodyParserError.message);
+    if (usesStructuredErrors(req)) {
+      res.status(bodyParserError.statusCode).json({
+        error: {
+          code: bodyParserError.code,
+          message: bodyParserError.message,
+          requestId: requestId(req),
+        },
+      });
+      return;
+    }
+    res.status(bodyParserError.statusCode).json({ error: bodyParserError.message });
     return;
   }
   if (err instanceof Error) {
