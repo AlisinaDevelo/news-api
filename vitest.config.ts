@@ -8,6 +8,12 @@ export default defineConfig({
       reporter: ["text", "json-summary", "lcov"],
       include: ["src/**/*.ts"],
       exclude: ["**/node_modules/**"],
+      thresholds: {
+        statements: 80,
+        lines: 80,
+        functions: 80,
+        branches: 75,
+      },
     },
   },
 });
