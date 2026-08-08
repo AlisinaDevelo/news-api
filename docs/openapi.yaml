@@ -118,6 +118,8 @@ paths:
                 $ref: "#/components/schemas/ArticleSearchEnvelope"
         "400":
           $ref: "#/components/responses/V1BadRequest"
+        "405":
+          $ref: "#/components/responses/V1MethodNotAllowed"
         "401":
           $ref: "#/components/responses/V1Unauthorized"
         "429":
@@ -160,6 +162,8 @@ paths:
                 $ref: "#/components/schemas/ArticleSearchEnvelope"
         "400":
           $ref: "#/components/responses/V1BadRequest"
+        "405":
+          $ref: "#/components/responses/V1MethodNotAllowed"
         "401":
           $ref: "#/components/responses/V1Unauthorized"
         "429":
@@ -198,6 +202,8 @@ paths:
                 $ref: "#/components/schemas/ArticleEnvelope"
         "400":
           $ref: "#/components/responses/V1BadRequest"
+        "405":
+          $ref: "#/components/responses/V1MethodNotAllowed"
         "401":
           $ref: "#/components/responses/V1Unauthorized"
         "404":
@@ -249,6 +255,8 @@ paths:
                 $ref: "#/components/schemas/SourceArticlesEnvelope"
         "400":
           $ref: "#/components/responses/V1BadRequest"
+        "405":
+          $ref: "#/components/responses/V1MethodNotAllowed"
         "401":
           $ref: "#/components/responses/V1Unauthorized"
         "429":
@@ -343,6 +351,8 @@ paths:
                   $ref: "#/components/schemas/Article"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
@@ -383,6 +393,8 @@ paths:
                 $ref: "#/components/schemas/Article"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -483,6 +495,8 @@ paths:
                   $ref: "#/components/schemas/Article"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
@@ -602,6 +616,11 @@ components:
       description: Draft-8 rate-limit policy identifier.
       schema:
         type: string
+    Allow:
+      description: Methods supported by the read-only API resource.
+      schema:
+        type: string
+        example: "GET, HEAD, OPTIONS"
 
   responses:
     Unauthorized:
@@ -612,6 +631,15 @@ components:
             $ref: "#/components/schemas/ErrorBody"
     BadRequest:
       description: Invalid or missing parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    MethodNotAllowed:
+      description: HTTP method is not supported for this read-only resource
+      headers:
+        Allow:
+          $ref: "#/components/headers/Allow"
       content:
         application/json:
           schema:
@@ -649,6 +677,15 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     V1BadRequest:
       description: Invalid or missing parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    V1MethodNotAllowed:
+      description: HTTP method is not supported for this read-only resource
+      headers:
+        Allow:
+          $ref: "#/components/headers/Allow"
       content:
         application/json:
           schema:

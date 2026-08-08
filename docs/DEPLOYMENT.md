@@ -88,6 +88,7 @@ For a recruiter-facing public demo, the best default is:
 - Rate limited: `RATE_LIMIT_MAX=60` or lower until you know traffic is tiny.
 - Logs: `LOG_LEVEL=info`; access logs keep only a bounded request ID, method, pathname, status, and latency, with no API keys, cookies, request bodies, query strings, or remote addresses.
 - Request bodies: JSON parsing is scoped to `/api` after the API-key gate, and compressed request bodies are rejected with `415` before inflation.
+- API routes: documented resources are read-only; unsupported methods return `405` with `Allow: GET, HEAD, OPTIONS`, `OPTIONS` returns `204`, and unknown API paths return JSON rather than an HTML error page.
 
 That gives people something real to inspect without turning your GNews quota into a public vending machine.
 

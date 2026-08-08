@@ -108,6 +108,12 @@ so the error handler logs only the fixed parser type and status and increments
 API-key authentication. Request inflation is disabled, so `Content-Encoding: gzip`, `br`, or
 `deflate` returns `415` with `unsupported_content_encoding` before decompression.
 
+The API is read-only. A method sent to a known resource that is not `GET`, `HEAD`, or `OPTIONS`
+returns `405` with `Allow: GET, HEAD, OPTIONS`; `OPTIONS` returns `204`. A request to an unknown
+`/api/v1/*` path returns the structured `route_not_found` error, while an unknown legacy `/api/*`
+path returns the legacy JSON error. A `401` can still take precedence when API keys are enabled,
+because authentication remains ahead of route classification.
+
 Warnings for malformed transport input and per-socket request drops use an independent budget per
 fixed event label. `SERVER_TRANSPORT_LOG_BURST` and `SERVER_TRANSPORT_LOG_WINDOW_MS` bound log
 volume without dropping telemetry: every event increments `news_http_server_events_total`, while

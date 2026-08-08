@@ -113,6 +113,11 @@ or parser messages. Parsing is scoped to `/api` after rate limiting and API-key 
 request bodies with `Content-Encoding: gzip`, `br`, or `deflate` return `415` with
 `unsupported_content_encoding` before inflation.
 
+Documented `/api` resources are read-only. Unsupported methods return `405` with
+`Allow: GET, HEAD, OPTIONS`; `OPTIONS` returns `204` with that header. Unknown `/api/v1/*`
+paths return a structured `route_not_found` error, while unknown legacy `/api/*` paths keep
+the legacy JSON error shape.
+
 **Examples**
 
 ```http

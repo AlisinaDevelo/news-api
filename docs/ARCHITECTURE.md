@@ -114,6 +114,12 @@ the service has no compressed request-body contract.
 
 Unhandled promise rejections in async route handlers are forwarded by `asyncHandler` to Express. Legacy endpoints keep the original JSON `{ "error": "..." }` shape for compatibility. Versioned `/api/v1/*` endpoints return structured errors with stable machine-readable codes: `{ "error": { "code": "...", "message": "...", "requestId": "..." } }`. Body-parser failures use `request_body_too_large` for `413` and `invalid_json_body` for `400`.
 
+The documented API resources are read-only route families. Unsupported methods are handled by
+the route itself and return `405` with `Allow: GET, HEAD, OPTIONS`; `OPTIONS` returns a bodyless
+`204`. The API-scoped fallback runs after rate limiting, API-key authentication, and JSON parsing,
+so unknown `/api/v1/*` paths return the structured `route_not_found` contract while unknown legacy
+`/api/*` paths preserve the legacy string error shape.
+
 ## Caching
 
 Article arrays are stored per normalized search key with a **600-second** TTL (`src/cache/store.ts`). Without `REDIS_URL`, `node-cache` is used with a configurable `CACHE_MAX_KEYS` bound and least-recently-used eviction (default `2000`); with `REDIS_URL`, **ioredis** stores JSON payloads for shared caches across replicas and exposes the short lease capability used for cold-miss coordination.

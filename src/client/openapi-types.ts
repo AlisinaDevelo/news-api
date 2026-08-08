@@ -342,6 +342,16 @@ export interface components {
                 "application/json": components["schemas"]["ErrorBody"];
             };
         };
+        /** @description HTTP method is not supported for this read-only resource */
+        MethodNotAllowed: {
+            headers: {
+                Allow: components["headers"]["Allow"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorBody"];
+            };
+        };
         /** @description Client or upstream provider rate limit exceeded; Retry-After is present when available. */
         TooManyRequests: {
             headers: {
@@ -384,6 +394,16 @@ export interface components {
         /** @description Invalid or missing parameters */
         V1BadRequest: {
             headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description HTTP method is not supported for this read-only resource */
+        V1MethodNotAllowed: {
+            headers: {
+                Allow: components["headers"]["Allow"];
                 [name: string]: unknown;
             };
             content: {
@@ -471,6 +491,8 @@ export interface components {
         RateLimit: string;
         /** @description Draft-8 rate-limit policy identifier. */
         RateLimitPolicy: string;
+        /** @description Methods supported by the read-only API resource. */
+        Allow: string;
     };
     pathItems: never;
 }
@@ -625,6 +647,7 @@ export interface operations {
             };
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
+            405: components["responses"]["V1MethodNotAllowed"];
             429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
@@ -671,6 +694,7 @@ export interface operations {
             };
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
+            405: components["responses"]["V1MethodNotAllowed"];
             429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
@@ -712,6 +736,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            405: components["responses"]["V1MethodNotAllowed"];
             429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
@@ -758,6 +783,7 @@ export interface operations {
             };
             400: components["responses"]["V1BadRequest"];
             401: components["responses"]["V1Unauthorized"];
+            405: components["responses"]["V1MethodNotAllowed"];
             429: components["responses"]["V1TooManyRequests"];
             500: components["responses"]["V1InternalError"];
             502: components["responses"]["V1BadGateway"];
@@ -802,6 +828,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            405: components["responses"]["MethodNotAllowed"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
             502: components["responses"]["BadGateway"];
@@ -842,6 +869,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            405: components["responses"]["MethodNotAllowed"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
             502: components["responses"]["BadGateway"];
@@ -886,6 +914,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            405: components["responses"]["MethodNotAllowed"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
             502: components["responses"]["BadGateway"];
