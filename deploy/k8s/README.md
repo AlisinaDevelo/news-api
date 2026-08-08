@@ -38,6 +38,11 @@ Replace `image: news-api:latest` in `deployment.yaml` with your registry referen
 
 Tune `replicas`, resources, and `TRUST_PROXY` for your ingress or service mesh.
 
+The readiness probe includes a bounded rate-limit Redis `PING` when `REDIS_URL` is set and rate
+limiting is enabled. A Redis outage removes affected pods from Service traffic without failing the
+process-only `/health` probe; readiness recovers after ioredis reconnects. When rate limiting is
+disabled, Redis is cache-only and remains fail-open for readiness.
+
 ## Rollouts and shutdown
 
 The example deployment sets `SHUTDOWN_TIMEOUT_MS=10000` and a 15-second

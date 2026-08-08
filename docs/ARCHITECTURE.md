@@ -76,8 +76,10 @@ flowchart LR
 ```
 
 Liveness `/health` and readiness `/ready` back the probes in the example
-[Kubernetes manifests](../deploy/k8s/); `REDIS_URL` switches the cache from per-pod memory
-to the shared store drawn above.
+[Kubernetes manifests](../deploy/k8s/). Readiness checks provider configuration and graceful drain
+state, then uses the existing bounded command runner to `PING` Redis when it backs the fail-closed
+shared rate limiter. Cache-only Redis remains fail-open and does not gate readiness. `REDIS_URL`
+switches the cache from per-pod memory to the shared store drawn above.
 
 ## Configuration
 
@@ -131,8 +133,10 @@ Responses at or above 1 KiB are compressed when the client advertises support. I
 Rate limits use the in-process store without `REDIS_URL`. With `REDIS_URL`, each process uses a
 separate Redis connection and a namespaced `rate-limit-redis` store so replicas share quotas without
 sharing cache lifecycle state. The rate-limit Redis client uses bounded command/connection budgets,
-one request retry, and a bounded readiness gate before raw `sendCommand` calls. Store errors fail
-closed with a structured `503`; IPv6 client keys
+one request retry, and a bounded readiness gate before raw `sendCommand` calls. `/ready` probes the
+same client through that bounded command path; a failed `PING` removes the replica from readiness,
+while recovery is detected without a process restart. Store errors fail closed with a structured
+`503`; cache-only Redis does not participate in readiness. IPv6 client keys
 use the explicit `/56` subnet policy and trusted proxy behavior remains controlled by `TRUST_PROXY`.
 
 Successful upstream searches write both a fresh cache key and a longer-lived stale key. The fresh key protects latency and quota under normal conditions; the stale key is only read after an upstream failure. Versioned responses expose this through `meta.cache=stale` and `X-Cache-Status: stale`.

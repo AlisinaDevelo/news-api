@@ -15,7 +15,7 @@ Set these variables on the hosting platform:
 | `RATE_LIMIT_MAX` | `60` | Keep demo quota burn low. |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | One-minute demo window. |
 | `CLIENT_API_KEYS` | generated secret | Recommended for a public demo; protects `/api/*`. |
-| `REDIS_URL` | managed Redis URL | Optional. Use it if the platform makes Redis cheap/easy. |
+| `REDIS_URL` | managed Redis URL | Optional. Shared rate limiting makes Redis a readiness dependency; cache-only use remains fail-open. |
 | `CACHE_REDIS_COMMAND_TIMEOUT_MS` | `500` | Article-cache Redis reply budget; values above `1000` ms are clamped. Cache failures remain fail-open. |
 | `CACHE_REDIS_CONNECT_TIMEOUT_MS` | `1000` | Article-cache Redis connection budget; values above `5000` ms are clamped. |
 | `RATE_LIMIT_REDIS_COMMAND_TIMEOUT_MS` | `500` | Shared rate-limit Redis reply budget; values above `1000` ms are clamped. Store failures return structured `503`. |
@@ -35,6 +35,11 @@ Set these variables on the hosting platform:
 | `UPSTREAM_TOTAL_TIMEOUT_MS` | `60000` | Total provider budget across retries; keep it below the platform request timeout. |
 
 Do not set `GNEWS_BASE_URL` in production unless you intentionally point at a compatible mock/provider. It exists for deterministic local tests, benchmarks, and CI smoke tests.
+
+When `REDIS_URL` is set and rate limiting is enabled, configure the platform health check to use
+`/ready`: it performs a bounded `PING` through the same Redis client used for shared quotas and
+returns `503` while that strict dependency is unavailable. `/health` remains a process-only
+liveness signal. If `DISABLE_RATE_LIMIT=1`, Redis is cache-only and does not gate readiness.
 
 ## Render
 

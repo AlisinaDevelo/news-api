@@ -20,7 +20,7 @@ Full diagram and component notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 - **Request boundary:** Strict JSON parsing with a 32768-byte default body limit, a bounded `SERVER_MAX_JSON_BODY_BYTES` override up to 262144 bytes, and fixed 400/413/415 parser responses.
 - **Reliability:** Per-attempt and total upstream deadlines, explicit HTTP request/header-size/keep-alive/socket limits, response validation, bounded cache capacity, stale-on-error cache fallback, disconnect-aware cancellation, renewable owner-safe Redis cache-miss leases across replicas, bounded fail-fast Redis cache and rate-limit commands during reconnects, gzip compression for responses at or above 1 KiB, `502` for provider/transport failures, provider circuit breaker with `503` short-circuiting, graceful shutdown on `SIGTERM` / `SIGINT`.
 - **Observability:** privacy-safe JSON access logs via [Pino](https://getpino.io/) with bounded `x-request-id` correlation, **`GET /metrics`** ([Prometheus](https://prometheus.io/) text format), cache hit/miss/stale/error/coalescing/coordination/eviction + request cancellation + rate-limit store + upstream latency/circuit + pre-Express transport-event, warning-suppression, and request-ID rejection metrics, and optional **OpenTelemetry** traces to OTLP (`OTEL_EXPORTER_OTLP_*`) with low-cardinality search, cache, retry, circuit, upstream, and stale-fallback spans.
-- **Kubernetes-style probes:** `GET /health` (liveness), `GET /ready` (readiness when the API key is configured; `503` while draining).
+- **Kubernetes-style probes:** `GET /health` (process liveness), `GET /ready` (provider configuration, graceful drain state, and bounded rate-limit Redis availability when that fail-closed store is enabled).
 - **Supply chain:** `npm audit` in CI; **SPDX SBOM** artifacts; Docker builds with **SBOM + provenance**; **dependency review** on PRs; fail-closed **SLSA-style lockfile attestation** on `main`; full-SHA-pinned GitHub Actions with a CI guard; lockfile-only installs.
 - **Contract:** OpenAPI at **`GET /openapi.yaml`** (also on disk as [docs/openapi.yaml](docs/openapi.yaml)).
 - **Container:** multi-stage [Dockerfile](Dockerfile) (non-root user, healthcheck).
@@ -94,7 +94,7 @@ Base path: `/api`. Machine-readable schema: **`GET /openapi.yaml`** · source fi
 |--------|------|-------------|
 | `GET` | `/` | Service capability document linking API versions, docs, and observability endpoints. |
 | `GET` | `/health` | Liveness: `{ "status": "ok", "uptime": number }`. |
-| `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` is missing or the process is draining (non-test). |
+| `GET` | `/ready` | Readiness; `503` if `GNEWS_API_KEY` is missing, required rate-limit Redis is unavailable, or the process is draining (non-test). Cache-only Redis does not gate readiness. |
 | `GET` | `/openapi.yaml` | OpenAPI 3 document (`application/yaml`). |
 | `GET` | `/metrics` | Prometheus metrics (skips rate limit), including HTTP totals, pre-Express transport events, cache hit/miss/stale/error/coalescing counts, and upstream latency. |
 | `GET` | `/api/v1/articles` | Versioned search. Returns `{ data, meta }`, including `count`, `page`, normalized filters, cache status, and `requestId`. |
@@ -150,7 +150,7 @@ Legacy errors: `{ "error": "message" }`. Versioned `/api/v1/*` success responses
 | `npm run client:generate` | Generate TypeScript client types from `docs/openapi.yaml`. |
 | `npm run client:check` | Regenerate client types and fail if checked-in output is stale. |
 | `npm run smoke` | Curl-based smoke test against a running instance (`BASE_URL`, `QUERY`, `COUNT`, `PAGE`, optional `CLIENT_API_KEY`). |
-| `npm run smoke:docker` | Compose smoke test: boot Redis, the image, a fake GNews provider, and two rate-limit replicas; run the HTTP smoke and shared-quota proof. |
+| `npm run smoke:docker` | Compose smoke test: boot Redis, the image, a fake GNews provider, and two rate-limit replicas; prove HTTP behavior, shared quotas, cross-replica cache coordination, and Redis readiness loss/recovery. |
 | `npm run benchmark:local` | Builds the app, starts a fake GNews provider, and measures cold searches vs warm cache hits. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md). |
 
 ## Project layout
