@@ -137,6 +137,44 @@ describe("app", () => {
     );
   });
 
+  it("returns 405 with the read-only Allow contract", async () => {
+    const res = await request(app).post("/api/v1/articles");
+
+    expect(res.status).toBe(405);
+    expect(res.headers.allow).toBe("GET, HEAD, OPTIONS");
+    expect(res.body).toMatchObject({
+      error: {
+        code: "method_not_allowed",
+        message: "Method not allowed",
+      },
+    });
+    expect(typeof res.body.error.requestId).toBe("string");
+  });
+
+  it("answers OPTIONS for a read-only route without a response body", async () => {
+    const res = await request(app).options("/api/articles");
+
+    expect(res.status).toBe(204);
+    expect(res.headers.allow).toBe("GET, HEAD, OPTIONS");
+    expect(res.text).toBe("");
+  });
+
+  it("returns JSON not-found contracts for unknown API routes", async () => {
+    const versioned = await request(app).get("/api/v1/unknown");
+    expect(versioned.status).toBe(404);
+    expect(versioned.body).toEqual({
+      error: {
+        code: "route_not_found",
+        message: "API route not found",
+        requestId: versioned.headers["x-request-id"],
+      },
+    });
+
+    const legacy = await request(app).get("/api/unknown");
+    expect(legacy.status).toBe(404);
+    expect(legacy.body).toEqual({ error: "API route not found" });
+  });
+
   it("GET /ready returns ready in test", async () => {
     const res = await request(app).get("/ready");
     expect(res.status).toBe(200);

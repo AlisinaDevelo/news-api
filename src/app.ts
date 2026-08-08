@@ -11,6 +11,7 @@ import { applyTrustProxy } from "./middleware/trustProxy";
 import { httpLogger } from "./logger";
 import { metricsRequestObserver } from "./middleware/metricsHttp";
 import { clientApiKeyGate } from "./middleware/clientApiKey";
+import { apiNotFound } from "./middleware/apiErrors";
 import { register as metricsRegister } from "./metrics/register";
 import { DEFAULT_COMPRESSION_THRESHOLD_BYTES } from "./constants";
 import { isDraining } from "./runtime/lifecycle";
@@ -107,6 +108,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/api", clientApiKeyGate, jsonBodyParser, routes);
+app.use("/api", apiNotFound);
 
 app.use(errorHandler);
 
