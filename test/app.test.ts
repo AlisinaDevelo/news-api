@@ -949,6 +949,46 @@ describe("CLIENT_API_KEYS gate", () => {
     expect(res.status).toBe(200);
   });
 
+  it("allows a later key in a rotation set", async () => {
+    vi.stubEnv("CLIENT_API_KEYS", "retiring-key, current-key");
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+
+    const res = await request(app)
+      .get("/api/articles?query=x&count=1")
+      .set("X-API-Key", "current-key");
+
+    expect(res.status).toBe(200);
+  });
+
+  it.each(["secret-on", "secret-one-extra", "secret-onf"])(
+    "rejects a near-match API key: %s",
+    async (providedKey) => {
+      const res = await request(app)
+        .get("/api/v1/articles?query=x&count=1")
+        .set("X-API-Key", providedKey);
+
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        error: {
+          code: "invalid_api_key",
+          message: "Invalid or missing API key",
+        },
+      });
+      expect(mockGet).not.toHaveBeenCalled();
+    }
+  );
+
+  it("treats byte-distinct Unicode keys as different secrets", async () => {
+    vi.stubEnv("CLIENT_API_KEYS", "caf\u00e9-key");
+
+    const res = await request(app)
+      .get("/api/v1/articles?query=x&count=1")
+      .set("X-API-Key", "caf\u00e8-key");
+
+    expect(res.status).toBe(401);
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
   it("checks the API key before parsing a request body", async () => {
     const res = await request(app)
       .post("/api/v1/articles")
