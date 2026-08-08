@@ -12,7 +12,7 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 4. **`npm run contract`** — [Redocly CLI](https://redocly.com/docs/cli) validates `docs/openapi.yaml` so the published API contract stays parseable and policy-compliant.
 5. **`npm run client:check`** — regenerates OpenAPI TypeScript client types and fails if checked-in generated output is stale.
 6. **`npm test`** — [Vitest](https://vitest.dev/). GNews is **not** called: tests mock `axios`; no API key in GitHub Actions. Response contract tests compile selected `docs/openapi.yaml` schemas and validate real HTTP responses.
-7. **`npm run test:coverage`** — **Node 22 only**; uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
+7. **`npm run test:coverage`** — **Node 22 only**; enforces global minimums of **80% statements, 80% lines, 80% functions, and 75% branches**, then uploads the `coverage/` directory (including `lcov.info`) as a workflow artifact named `coverage-lcov`.
 8. **[Codecov](https://codecov.io)** — **Node 22 only**; uploads `coverage/lcov.info`. For private repos set repository secret `CODECOV_TOKEN`. `fail_ci_if_error` is off so missing token does not break the build.
 9. **`npm run build`** — TypeScript compile to `dist/`.
 
@@ -31,7 +31,7 @@ The [workflow](../.github/workflows/ci.yml) runs on `ubuntu-latest` with **Node.
 
 ### `main` branch pushes only
 
-14. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json` (best-effort; `continue-on-error` if attestations are unavailable on the plan).
+14. **[Provenance](../.github/workflows/provenance.yml)** — [build provenance attestation](https://github.com/actions/attest-build-provenance) for `package-lock.json`; the `main` workflow fails if the attestation cannot be produced.
 
 ### Code scanning (`CodeQL` workflow)
 
@@ -54,6 +54,7 @@ npm run lint
 npm run contract
 npm run client:check
 npm test
+npm run test:coverage
 npm run build
 docker build .
 npm run smoke:docker
@@ -65,7 +66,7 @@ Optional (matches the CI Docker job more closely, requires Buildx):
 docker buildx build . --tag news-api:local --provenance=mode=max --sbom=true --load
 ```
 
-Coverage (matches the Node 22 CI step):
+Coverage (matches the Node 22 CI step and enforces the repository floor):
 
 ```bash
 npm run test:coverage

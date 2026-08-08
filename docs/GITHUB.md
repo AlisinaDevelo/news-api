@@ -9,6 +9,8 @@ Suggested rules:
 - Require a pull request before merging (at least one review for teams; solo maintainers may use zero).
 - Require status checks to pass before merging (exact names depend on GitHub’s UI):
   - `test` matrix jobs for Node 20 and 22, `docker`, `CodeQL`, `sbom`, `dependency-review` (PRs), `attest-lockfile` (`main`), and any other workflows you enable.
+- The Node 22 `test` job enforces the global coverage floor through `npm run test:coverage`; keep that check required with the rest of the matrix.
+- The `attest-lockfile` check is fail-closed on `main`; an unavailable or failed lockfile attestation should block the push workflow rather than be treated as advisory.
 - Require branches to be up to date before merging.
 - Do not allow bypassing the above for administrators unless you intentionally want break-glass access.
 
