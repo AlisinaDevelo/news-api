@@ -348,6 +348,7 @@ describe("app", () => {
     expect(res.status).toBe(200);
     expect(res.headers["x-api-version"]).toBe("v1");
     expect(res.headers["x-cache-status"]).toBe("miss");
+    expect(res.headers.etag).toMatch(/^W\/"sha256-[A-Za-z0-9_-]+"$/);
     expect(res.body).toMatchObject({
       data: sampleArticles,
       meta: {
@@ -373,6 +374,37 @@ describe("app", () => {
     expect(res.headers["x-cache-status"]).toBe("hit");
     expect(res.body.meta.cache).toBe("hit");
     expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 304 for an unchanged v1 representation", async () => {
+    mockGet.mockResolvedValue({ data: { articles: sampleArticles } });
+    const q = `v1-conditional-${Math.random().toString(36).slice(2)}`;
+    const path = `/api/v1/articles?query=${encodeURIComponent(q)}&count=2`;
+    const first = await request(app).get(path).set("X-Request-Id", "conditional-first");
+    const second = await request(app)
+      .get(path)
+      .set("X-Request-Id", "conditional-second")
+      .set("If-None-Match", first.headers.etag);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(304);
+    expect(second.headers.etag).toBe(first.headers.etag);
+    expect(second.headers["x-api-version"]).toBe("v1");
+    expect(second.headers["x-cache-status"]).toBe("hit");
+    expect(second.text ?? "").toBe("");
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps returning 200 when the v1 validator does not match", async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: sampleArticles } });
+    const q = `v1-conditional-mismatch-${Math.random().toString(36).slice(2)}`;
+    const res = await request(app)
+      .get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=2`)
+      .set("If-None-Match", '"different"');
+
+    expect(res.status).toBe(200);
+    expect(res.headers.etag).toMatch(/^W\/"sha256-[A-Za-z0-9_-]+"$/);
+    expect(res.body.data).toEqual(sampleArticles);
   });
 
   it("GET /api/v1/articles/search aliases the v1 search endpoint", async () => {
@@ -668,6 +700,7 @@ describe("app", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers["x-api-version"]).toBe("v1");
+    expect(res.headers.etag).toMatch(/^W\/"sha256-[A-Za-z0-9_-]+"$/);
     expect(res.body.data.title).toBe("Alpha headline");
     expect(res.body.meta).toMatchObject({ title: "Alpha headline" });
     expect(typeof res.body.meta.requestId).toBe("string");
@@ -711,6 +744,7 @@ describe("app", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers["x-api-version"]).toBe("v1");
+    expect(res.headers.etag).toMatch(/^W\/"sha256-[A-Za-z0-9_-]+"$/);
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].source.name).toBe("BBC");
     expect(res.body.meta).toMatchObject({ source: "BBC", count: 10, page: 2 });
