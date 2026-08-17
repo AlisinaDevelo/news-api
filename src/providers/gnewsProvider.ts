@@ -5,7 +5,11 @@ import {
   UPSTREAM_TIMEOUT_MS,
   UPSTREAM_TOTAL_TIMEOUT_MS,
 } from "../config/upstream";
-import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../constants";
+import {
+  MAX_ARTICLE_COUNT,
+  MAX_RETRY_AFTER_SECONDS,
+  MAX_UPSTREAM_RESPONSE_BYTES,
+} from "../constants";
 import { HttpError } from "../errors/HttpError";
 import { retryAfterFromHeaders } from "../http/retryAfter";
 import {
@@ -50,13 +54,23 @@ function cooldownMs(): number {
   return resolvePositiveIntegerEnv(process.env.UPSTREAM_CIRCUIT_COOLDOWN_MS, 30_000, 300_000);
 }
 
+function circuitRetryAfter(now: number): string {
+  if (circuit.openedAt === undefined) {
+    return "1";
+  }
+  const remainingMs = circuit.openedAt + cooldownMs() - now;
+  const seconds = Math.max(1, Math.ceil(remainingMs / 1_000));
+  return String(Math.min(seconds, MAX_RETRY_AFTER_SECONDS));
+}
+
 function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
   if (circuit.openedAt === undefined && circuit.halfOpenInFlight) {
     upstreamCircuitEventsTotal.inc({ event: "short_circuit" });
     throw new HttpError(
       503,
       "Upstream news service temporarily unavailable",
-      "upstream_circuit_open"
+      "upstream_circuit_open",
+      circuitRetryAfter(now)
     );
   }
 
@@ -69,7 +83,8 @@ function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
     throw new HttpError(
       503,
       "Upstream news service temporarily unavailable",
-      "upstream_circuit_open"
+      "upstream_circuit_open",
+      circuitRetryAfter(now)
     );
   }
 

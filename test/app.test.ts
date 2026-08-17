@@ -812,20 +812,29 @@ describe("app", () => {
   });
 
   it("opens the upstream circuit after repeated provider failures", async () => {
+    vi.stubEnv("UPSTREAM_CIRCUIT_COOLDOWN_MS", "10000");
+    vi.stubEnv("UPSTREAM_RETRY_ATTEMPTS", "0");
     mockGet.mockRejectedValue(new axios.AxiosError("timeout"));
     const q = `circuit-${Math.random().toString(36).slice(2)}`;
 
-    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
-    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
-    await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
-    const res = await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+    try {
+      await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+      await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+      await request(app).get(`/api/v1/articles?query=${encodeURIComponent(q)}&count=1`);
+      const res = await request(app).get(
+        `/api/v1/articles?query=${encodeURIComponent(q)}&count=1`
+      );
 
-    expect(res.status).toBe(503);
-    expect(res.body.error).toMatchObject({
-      code: "upstream_circuit_open",
-      message: "Upstream news service temporarily unavailable",
-    });
-    expect(mockGet).toHaveBeenCalledTimes(3);
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatchObject({
+        code: "upstream_circuit_open",
+        message: "Upstream news service temporarily unavailable",
+      });
+      expect(res.headers["retry-after"]).toBe("10");
+      expect(mockGet).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("does not open the circuit for permanent upstream client errors", async () => {
@@ -937,6 +946,8 @@ describe("app", () => {
       ]);
 
       expect([first.status, second.status].sort()).toEqual([200, 503]);
+      const shortCircuited = first.status === 503 ? first : second;
+      expect(shortCircuited.headers["retry-after"]).toBe("1");
       expect(mockGet).toHaveBeenCalledTimes(1);
     } finally {
       vi.unstubAllEnvs();
