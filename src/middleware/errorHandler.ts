@@ -27,11 +27,16 @@ export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
-  _next: NextFunction
+  next: NextFunction
 ): void {
   const log = req.log ?? logger;
 
   if (isRequestAbortedError(err)) {
+    return;
+  }
+
+  if (res.headersSent) {
+    next(err);
     return;
   }
 
