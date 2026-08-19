@@ -40,6 +40,8 @@ interface CircuitState {
   halfOpenInFlight: boolean;
 }
 
+type CircuitRequestState = "closed" | "half_open";
+
 const circuit: CircuitState = {
   failures: 0,
   openedAt: undefined,
@@ -63,7 +65,7 @@ function circuitRetryAfter(now: number): string {
   return String(Math.min(seconds, MAX_RETRY_AFTER_SECONDS));
 }
 
-function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
+function assertCircuitAllowsRequest(now = Date.now()): CircuitRequestState {
   if (circuit.openedAt === undefined && circuit.halfOpenInFlight) {
     upstreamCircuitEventsTotal.inc({ event: "short_circuit" });
     throw new HttpError(
@@ -94,7 +96,7 @@ function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
   return "half_open";
 }
 
-function recordProviderSuccess(): void {
+function closeCircuit(): void {
   if (circuit.failures > 0 || circuit.openedAt !== undefined || circuit.halfOpenInFlight) {
     upstreamCircuitEventsTotal.inc({ event: "closed" });
   }
@@ -110,6 +112,15 @@ function recordProviderFailure(): void {
     circuit.openedAt = Date.now();
     upstreamCircuitEventsTotal.inc({ event: "opened" });
   }
+}
+
+function recordCanceledProbe(circuitState: CircuitRequestState): void {
+  if (circuitState !== "half_open") {
+    return;
+  }
+  circuit.halfOpenInFlight = false;
+  circuit.openedAt = Date.now();
+  upstreamCircuitEventsTotal.inc({ event: "opened" });
 }
 
 function shouldRecordProviderFailure(error: unknown): boolean {
@@ -232,7 +243,7 @@ export class GNewsProvider implements NewsProvider {
             span.setAttribute("news.upstream.outcome", "success");
             upstreamRequestsTotal.inc({ outcome: "success" });
             stopUpstreamTimer({ outcome: "success" });
-            recordProviderSuccess();
+            closeCircuit();
             return articles;
           } catch (err) {
             const deadlineExceeded =
@@ -249,6 +260,7 @@ export class GNewsProvider implements NewsProvider {
               span.setAttribute("news.upstream.outcome", "canceled");
               upstreamRequestsTotal.inc({ outcome: "canceled" });
               stopUpstreamTimer({ outcome: "canceled" });
+              recordCanceledProbe(circuitState);
               throw err instanceof RequestAbortedError ? err : new RequestAbortedError();
             }
             const outcome =
@@ -258,6 +270,9 @@ export class GNewsProvider implements NewsProvider {
             stopUpstreamTimer({ outcome });
             if (shouldRecordProviderFailure(err)) {
               recordProviderFailure();
+            } else if (circuitState === "half_open") {
+              // A permanent response proves reachability even though this request failed.
+              closeCircuit();
             }
             if (axios.isAxiosError(err)) {
               throw mapAxiosError(err);
