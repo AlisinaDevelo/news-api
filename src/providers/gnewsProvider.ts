@@ -5,7 +5,11 @@ import {
   UPSTREAM_TIMEOUT_MS,
   UPSTREAM_TOTAL_TIMEOUT_MS,
 } from "../config/upstream";
-import { MAX_ARTICLE_COUNT, MAX_UPSTREAM_RESPONSE_BYTES } from "../constants";
+import {
+  MAX_ARTICLE_COUNT,
+  MAX_RETRY_AFTER_SECONDS,
+  MAX_UPSTREAM_RESPONSE_BYTES,
+} from "../constants";
 import { HttpError } from "../errors/HttpError";
 import { retryAfterFromHeaders } from "../http/retryAfter";
 import {
@@ -36,6 +40,8 @@ interface CircuitState {
   halfOpenInFlight: boolean;
 }
 
+type CircuitRequestState = "closed" | "half_open";
+
 const circuit: CircuitState = {
   failures: 0,
   openedAt: undefined,
@@ -50,13 +56,23 @@ function cooldownMs(): number {
   return resolvePositiveIntegerEnv(process.env.UPSTREAM_CIRCUIT_COOLDOWN_MS, 30_000, 300_000);
 }
 
-function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
+function circuitRetryAfter(now: number): string {
+  if (circuit.openedAt === undefined) {
+    return "1";
+  }
+  const remainingMs = circuit.openedAt + cooldownMs() - now;
+  const seconds = Math.max(1, Math.ceil(remainingMs / 1_000));
+  return String(Math.min(seconds, MAX_RETRY_AFTER_SECONDS));
+}
+
+function assertCircuitAllowsRequest(now = Date.now()): CircuitRequestState {
   if (circuit.openedAt === undefined && circuit.halfOpenInFlight) {
     upstreamCircuitEventsTotal.inc({ event: "short_circuit" });
     throw new HttpError(
       503,
       "Upstream news service temporarily unavailable",
-      "upstream_circuit_open"
+      "upstream_circuit_open",
+      circuitRetryAfter(now)
     );
   }
 
@@ -69,7 +85,8 @@ function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
     throw new HttpError(
       503,
       "Upstream news service temporarily unavailable",
-      "upstream_circuit_open"
+      "upstream_circuit_open",
+      circuitRetryAfter(now)
     );
   }
 
@@ -79,7 +96,7 @@ function assertCircuitAllowsRequest(now = Date.now()): "closed" | "half_open" {
   return "half_open";
 }
 
-function recordProviderSuccess(): void {
+function closeCircuit(): void {
   if (circuit.failures > 0 || circuit.openedAt !== undefined || circuit.halfOpenInFlight) {
     upstreamCircuitEventsTotal.inc({ event: "closed" });
   }
@@ -95,6 +112,15 @@ function recordProviderFailure(): void {
     circuit.openedAt = Date.now();
     upstreamCircuitEventsTotal.inc({ event: "opened" });
   }
+}
+
+function recordCanceledProbe(circuitState: CircuitRequestState): void {
+  if (circuitState !== "half_open") {
+    return;
+  }
+  circuit.halfOpenInFlight = false;
+  circuit.openedAt = Date.now();
+  upstreamCircuitEventsTotal.inc({ event: "opened" });
 }
 
 function shouldRecordProviderFailure(error: unknown): boolean {
@@ -217,7 +243,7 @@ export class GNewsProvider implements NewsProvider {
             span.setAttribute("news.upstream.outcome", "success");
             upstreamRequestsTotal.inc({ outcome: "success" });
             stopUpstreamTimer({ outcome: "success" });
-            recordProviderSuccess();
+            closeCircuit();
             return articles;
           } catch (err) {
             const deadlineExceeded =
@@ -234,6 +260,7 @@ export class GNewsProvider implements NewsProvider {
               span.setAttribute("news.upstream.outcome", "canceled");
               upstreamRequestsTotal.inc({ outcome: "canceled" });
               stopUpstreamTimer({ outcome: "canceled" });
+              recordCanceledProbe(circuitState);
               throw err instanceof RequestAbortedError ? err : new RequestAbortedError();
             }
             const outcome =
@@ -243,6 +270,9 @@ export class GNewsProvider implements NewsProvider {
             stopUpstreamTimer({ outcome });
             if (shouldRecordProviderFailure(err)) {
               recordProviderFailure();
+            } else if (circuitState === "half_open") {
+              // A permanent response proves reachability even though this request failed.
+              closeCircuit();
             }
             if (axios.isAxiosError(err)) {
               throw mapAxiosError(err);

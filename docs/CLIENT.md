@@ -51,8 +51,9 @@ try {
 }
 ```
 
-For upstream throttling or temporary unavailability, `NewsApiClientError.retryAfter` contains the
-validated `Retry-After` delta-seconds value when the API received one.
+For upstream throttling, temporary unavailability, or an open provider circuit,
+`NewsApiClientError.retryAfter` contains the validated `Retry-After` delta-seconds value when the
+API supplies one.
 
 ## Conditional GETs
 
