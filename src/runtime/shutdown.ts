@@ -22,6 +22,8 @@ export function createShutdownHandler(options: ShutdownHandlerOptions): (signal:
   let started = false;
   let finalized = false;
   let cleanupStarted = false;
+  let cleanupCompleted = false;
+  let forced = false;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const exit = options.exit ?? ((code: number) => process.exit(code));
 
@@ -36,16 +38,22 @@ export function createShutdownHandler(options: ShutdownHandlerOptions): (signal:
         options.onCleanupError?.(error);
       })
       .finally(() => {
-        if (exitCode !== undefined) {
+        cleanupCompleted = true;
+        if (timeout !== undefined) {
+          clearTimeout(timeout);
+          timeout = undefined;
+        }
+        if (exitCode !== undefined && !forced) {
           exit(exitCode);
         }
       });
   };
 
   const forceExit = (): void => {
-    if (finalized) {
+    if (forced || cleanupCompleted) {
       return;
     }
+    forced = true;
     finalized = true;
     abortShutdown();
     options.server.closeAllConnections?.();
@@ -59,9 +67,6 @@ export function createShutdownHandler(options: ShutdownHandlerOptions): (signal:
       return;
     }
     finalized = true;
-    if (timeout !== undefined) {
-      clearTimeout(timeout);
-    }
     if (error) {
       options.onCloseError?.(error);
       startCleanup(1);

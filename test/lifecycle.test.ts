@@ -84,4 +84,47 @@ describe("runtime lifecycle", () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
     expect(exit).toHaveBeenCalledWith(1);
   });
+
+  it("forces exit when cleanup exceeds the shutdown deadline", async () => {
+    vi.useFakeTimers();
+    let closeCallback: ((error?: Error) => void) | undefined;
+    let resolveCleanup: (() => void) | undefined;
+    const server: ShutdownServer = {
+      close: vi.fn((callback: (error?: Error) => void) => {
+        closeCallback = callback;
+      }),
+      closeAllConnections: vi.fn(),
+    };
+    const cleanup = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCleanup = resolve;
+        })
+    );
+    const exit = vi.fn();
+    const onForced = vi.fn();
+    const shutdown = createShutdownHandler({
+      server,
+      timeoutMs: 500,
+      cleanup,
+      exit,
+      onForced,
+    });
+
+    shutdown("SIGTERM");
+    closeCallback?.();
+    await Promise.resolve();
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(exit).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(onForced).toHaveBeenCalledOnce();
+    expect(server.closeAllConnections).toHaveBeenCalledOnce();
+    expect(exit).toHaveBeenCalledWith(1);
+
+    resolveCleanup?.();
+    await Promise.resolve();
+    expect(exit).toHaveBeenCalledOnce();
+  });
 });
